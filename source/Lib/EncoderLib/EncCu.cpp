@@ -53,6 +53,261 @@
 #include <cmath>
 #include <algorithm>
 
+#include <stdio.h>
+#include <ctype.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include "svm.h"
+#include <opencv2/opencv.hpp>
+
+//paraments of standards
+double sns64x64_mean[8] = { 30.23994314755793 , 8930.148979240244 , 296151.14613661816 , 297175.16517357226 , 860.6283486949781 , 8818.645016797313 , 56706.4605478508 , 52574.28637264192 };
+double sns64x64_std[8] = { 5.570561272740123 , 15669.67346628856 , 367233.9504828237 , 343503.1676325897 , 1054.0012228898672 , 16083.492015980277 , 95713.39557038488 , 82406.82191976589 };
+
+double sns32x32_mean[8] = { 29.65003524317793 , 8146.886630248716 , 87759.15700835767 , 88317.01636290403 , 804.2294079146108 , 8284.618681401671 , 19636.87841103615 , 18158.692578793678 };
+double sns32x32_std[8] = { 5.530228538920632 , 14954.11014086681 , 105162.02803757225 , 95965.09362804933 , 932.5009479804614 , 15686.5205871857 , 30800.79371076709 , 26142.784997020204 };
+
+double sns16x16_mean[8] = { 28.786546973380712 , 10152.510304843838 , 33929.6709120379 , 32518.58141637055 , 960.8728071815972 , 11042.321270494358 , 9109.682270432018 , 8269.09082974877 };
+double sns16x16_std[8] =  { 5.582319182472159 , 16377.21719162141 , 35078.16201079971 , 30071.43901474147 , 892.4238252359091 , 18174.69958807325 , 11651.620370918548 , 9436.37000732152 };
+
+double sns8x8_mean[8] = { 27.930044634588356 , 14746.098176119587 , 13269.12231112015 , 11909.867973865705 , 1131.4899744685797 , 16526.52540430802 , 3993.9435276215104 , 3557.1005567520256 };
+double sns8x8_std[8] = { 5.409030079122717 , 19984.801020245388 , 12716.526588688965 , 10217.903583405723 , 863.8325274346552 , 22307.458828465395 , 4233.699368980527 , 3590.8113316205995 };
+
+double sns32x16_mean[8] =  { 29.35943634324173 , 4308.449605066367 , 31422.673396896615 , 44478.811109553186 , 567.6176504954198 , 4240.764780800149 , 5392.894688259487 , 9733.829208730604 };
+double sns32x16_std[8] =  { 5.545565106481371 , 8985.426858850167 , 32295.564502417885 , 45772.88209992739 , 573.0031498924972 , 9491.73784192234 , 8048.943355391944 , 14292.295444955635 };
+
+double sns32x8_mean[8] = { 28.41055373927258 , 4858.780813240703 , 18814.703054760932 , 28044.331354720067 , 625.7065794850838 , 4737.049060073559 , 3401.4242950551698 , 6566.703647323253 };
+double sns32x8_std[8] = { 5.5079698874962375 , 9661.260901938353 , 19587.991800658463 , 32300.58229658335 , 590.00293479029 , 10130.481084991861 , 4843.777749698557 , 9153.912408704768 };
+
+double sns32x4_mean[8] =  { 27.740062252772194 , 5750.640036314117 , 11633.812528370405 , 13646.081706763503 , 706.981064781791 , 5654.403800012969 , 2326.7056611114713 , 3772.216879579794 };
+double sns32x4_std[8] = { 5.376258562044021 , 10566.474262416277 , 11089.74513143502 , 15578.70520154854 , 608.5532734043769 , 10807.851390702415 , 2817.5703006683916 , 4997.927761881166 };
+
+double sns16x8_mean[8] =  { 28.190211657655283 , 10016.984217987603 , 18787.26369510748 , 19084.63306079388 , 964.9760451008835 , 10976.528794672293 , 4972.177284715812 , 5170.0650369247 };
+double sns16x8_std[8] = { 5.5047606986564155 , 15446.282465485307 , 18114.004526436667 , 16913.188485142167 , 790.8105010388504 , 17171.74908794391 , 5864.491941731874 , 5641.203490571166 };
+
+double sns16x4_mean[8] = { 27.6796142578125 , 12198.866157226563 , 11496.099125976563 , 8730.488002929687 , 1025.8911328125 , 13357.838071289063 , 3040.4042529296876 , 2579.8413916015625 };
+double sns16x4_std[8] = { 5.360837823372268 , 17425.34839708912 , 10664.152561030072 , 8090.788929475805 , 795.0322598020374 , 19339.267471959192 , 3276.1700129558694 , 2686.971499934231 };
+
+double sns8x4_mean[8] = { 27.332654493733433 , 18210.91780961089 , 8300.695205637601 , 5575.346762350725 , 1197.0884846637666 , 20878.517469729297 , 2528.6326046198037 , 1873.073093014879 };
+double sns8x4_std[8] = { 5.198528003745916 , 22659.340132926856 , 7488.337773030909 , 5073.402254114711 , 870.6987027129569 , 25776.809825078162 , 2420.502856753693 , 1841.8807185865123 };
+
+double hsvs32x32_mean[6] = { 29.340330756876128 , 82612.25304908653 , 90334.28133155993 , -183.63886518771332 , -1081.641638225256 , 1595.931916281871 };
+double hsvs32x32_std[6] = { 5.617710391302242 , 70036.00971650188 , 76330.67736347088 , 9599.458459211233 , 19396.189391668864 , 50341.186285912525 };
+
+double hsvs16x16_mean[6] = { 28.277339520494973 , 47863.69979505027 , 44427.990514307814 , -50.73587006960557 , 1322.4142691415313 , -1529.8356999226605 };
+double hsvs16x16_std[6] = { 5.487858117835053 , 37644.205063637644 , 31248.264797664528 , 13062.978288917246 , 12605.75492834301 , 21854.54547900211 };
+
+double hsvs32x16_mean[6] = { 28.561546192213207 , 42117.85907838904 , 58943.78630983399 , 619.0043735576565 , -2930.9262636789995 , 7948.728429985856 };
+double hsvs32x16_std[6] = { 5.613939920390887 , 37189.183207836395 , 52337.62697022514 , 8453.107429185862 , 11692.903804280137 , 32367.35842806607 };
+
+double hsvs32x8_mean[6] = { 27.95019373938787 , 22570.1538813183 , 34406.041251251685 , 126.79770560320432 , -2891.693108102225 , 4873.361487221908 };
+double hsvs32x8_std[6] = { 5.4941188315226395 , 20632.460123351608 , 32792.45567301366 , 8245.664754660596 , 7983.938060641934 , 18810.026049825265 };
+
+double hsvs16x8_mean[6] = { 27.696849255672785 , 25118.51760369996 , 25004.81517560341 , -1255.8181095534037 , -627.3228645758057 , -744.1527388350918 };
+double hsvs16x8_std[6] = { 5.37580462525544 , 20236.683904914004 , 17800.399415118558 , 13231.05787528914 , 7061.663467400905 , 13068.678645603492 };
+
+double hsvs8x8_mean[6] = { 27.490479423163112 , 16890.07320858928 , 14953.341590651446 , -441.0936338351217 , 544.1729258390235 , -736.9091442355857 };
+double hsvs8x8_std[6] = { 5.263796650190438 , 13444.362575997367 , 10612.811764167458 , 16751.385347684325 , 4352.7333746634595 , 8420.398554613395 };
+
+int cal_variance(cv::Mat &src)
+{
+  cv::Scalar mean;
+  cv::Scalar stddev;
+  cv::meanStdDev(src, mean, stddev);
+  int var = stddev.val[0] * stddev.val[0];
+  return var;
+}
+
+void cal_feature_sns(Partitioner& partitioner, const CodingStructure *cs, double* feature, double* standard_m, double* standard_s, bool w_over_h)
+{
+
+  int cu_w = partitioner.currArea().lwidth();
+  int cu_h = partitioner.currArea().lheight();
+  int cu_w2 = cu_w / 2;
+  int cu_h2 = cu_h / 2;
+
+  CPelBuf orgLuma = cs->picture->getTrueOrigBuf(partitioner.currArea().blocks[COMPONENT_Y]);
+
+  cv::Mat orgL = cv::Mat(cu_h, cu_w, CV_16UC1);
+  for( int i = 0; i < cu_h; ++i )
+  {
+          memcpy(orgL.data + sizeof(short) * cu_w * i, orgLuma.buf + orgLuma.stride * i, sizeof(short) * cu_w);
+  }
+
+  cv::Mat grad_x, grad_y;
+  cv::Mat abs_grad_x, abs_grad_y;
+
+  cv::Sobel(orgL, grad_x, CV_32F, 1, 0, 3);
+  cv::Sobel(orgL, grad_y, CV_32F, 0, 1, 3);
+
+  cv::Mat agrad_x = cv::abs(grad_x);
+  cv::Mat agrad_y = cv::abs(grad_y);
+
+  cv::Scalar mean;
+  cv::Scalar stddev;
+  cv::meanStdDev(orgL, mean, stddev);
+  int var = stddev.val[0] * stddev.val[0];
+
+  cv::Mat gradxht = agrad_x(cv::Rect(0, 0, cu_w, cu_h2));
+  cv::Mat gradxhb = agrad_x(cv::Rect(0, cu_h2, cu_w, cu_h2));
+  cv::Mat gradyht = agrad_y(cv::Rect(0, 0, cu_w, cu_h2));
+  cv::Mat gradyhb = agrad_y(cv::Rect(0, cu_h2, cu_w, cu_h2));
+
+  int ngradx   = cv::abs(cv::sum(gradxht)[0] + cv::sum(gradxhb)[0]);
+  int ngrady   = cv::abs(cv::sum(gradyht)[0] + cv::sum(gradyhb)[0]);
+
+  double gmaxx, gminx, gmaxy, gminy;
+
+  cv::minMaxLoc(agrad_x, &gminx, &gmaxx);
+  cv::minMaxLoc(agrad_y, &gminy, &gmaxy);
+  int gmx = int(max(gmaxx, gmaxy));
+
+  cv::Mat Ltl = orgL(cv::Rect(0, 0, cu_w2, cu_h2));
+  cv::Mat Ltr = orgL(cv::Rect(cu_w2, 0, cu_w2, cu_h2));
+  cv::Mat Lbl = orgL(cv::Rect(0, cu_h2, cu_w2, cu_h2));
+  cv::Mat Lbr = orgL(cv::Rect(cu_w2, cu_h2, cu_w2, cu_h2));
+
+  int vartl = cal_variance(Ltl);
+  int vartr = cal_variance(Ltr);
+  int varbl = cal_variance(Lbl);
+  int varbr = cal_variance(Lbr);
+
+  int MaxDiffVar = std::max({abs(vartl - vartr), abs(vartl - varbl),
+                      abs(vartl - varbr), abs(vartr - varbl),
+                      abs(vartr - varbr), abs(varbl - varbr)});
+
+  cv::Mat gradxtl = agrad_x(cv::Rect(0, 0, cu_w2, cu_h2));
+  cv::Mat gradxtr = agrad_x(cv::Rect(cu_w2, 0, cu_w2, cu_h2));
+  cv::Mat gradxbl = agrad_x(cv::Rect(0, cu_h2, cu_w2, cu_h2));
+  cv::Mat gradxbr = agrad_x(cv::Rect(cu_w2, cu_h2, cu_w2, cu_h2));
+
+  cv::Mat gradytl = agrad_y(cv::Rect(0, 0, cu_w2, cu_h2));
+  cv::Mat gradytr = agrad_y(cv::Rect(cu_w2, 0, cu_w2, cu_h2));
+  cv::Mat gradybl = agrad_y(cv::Rect(0, cu_h2, cu_w2, cu_h2));
+  cv::Mat gradybr = agrad_y(cv::Rect(cu_w2, cu_h2, cu_w2, cu_h2));
+
+  int MaxDiffgradx = std::max({cv::abs(cv::sum(gradxtl)[0] - cv::sum(gradxtr)[0]), cv::abs(cv::sum(gradxtl)[0] - cv::sum(gradxbl)[0]),
+                          cv::abs(cv::sum(gradxtl)[0] - cv::sum(gradxbr)[0]), cv::abs(cv::sum(gradxtr)[0] - cv::sum(gradxbl)[0]),
+                          cv::abs(cv::sum(gradxtr)[0] - cv::sum(gradxbr)[0]), cv::abs(cv::sum(gradxbl)[0] - cv::sum(gradxbr)[0])});
+  int MaxDiffgrady = std::max({cv::abs(cv::sum(gradytl)[0] - cv::sum(gradytr)[0]), cv::abs(cv::sum(gradytl)[0] - cv::sum(gradybl)[0]),
+                      cv::abs(cv::sum(gradytl)[0] - cv::sum(gradybr)[0]), cv::abs(cv::sum(gradytr)[0] - cv::sum(gradybl)[0]),
+                      cv::abs(cv::sum(gradytr)[0] - cv::sum(gradybr)[0]), cv::abs(cv::sum(gradybl)[0] - cv::sum(gradybr)[0])});
+
+
+  
+
+  if (w_over_h)
+  {
+    feature[0] = cs->baseQP;
+    feature[1] = var;
+    feature[2] = ngradx;
+    feature[3] = ngrady;
+    feature[4] = gmx;
+    feature[5] = MaxDiffVar;
+    feature[6] = MaxDiffgradx;
+    feature[7] = MaxDiffgrady;
+  }
+  else
+  {
+    feature[0] = cs->baseQP;
+    feature[1] = var;
+    feature[2] = ngrady;
+    feature[3] = ngradx;
+    feature[4] = gmx;
+    feature[5] = MaxDiffVar;
+    feature[6] = MaxDiffgrady;
+    feature[7] = MaxDiffgradx;
+  }
+
+  //standards
+  for(int i=0; i<8;i++)
+  {
+    feature[i] = (feature[i] - standard_m[i])/standard_s[i];
+  }
+}
+
+void cal_feature_hsvs(Partitioner& partitioner, const CodingStructure *cs, double* feature, double* standard_m, double* standard_s, bool w_over_h)
+{
+
+  int cu_w = partitioner.currArea().lwidth();
+  int cu_h = partitioner.currArea().lheight();
+  int cu_w2 = cu_w / 2;
+  int cu_h2 = cu_h / 2;
+
+  CPelBuf orgLuma = cs->picture->getTrueOrigBuf(partitioner.currArea().blocks[COMPONENT_Y]);
+
+  cv::Mat orgL = cv::Mat(cu_h, cu_w, CV_16UC1);
+  for( int i = 0; i < cu_h; ++i )
+  {
+          memcpy(orgL.data + sizeof(short) * cu_w * i, orgLuma.buf + orgLuma.stride * i, sizeof(short) * cu_w);
+  }
+
+  cv::Mat grad_x, grad_y;
+
+  cv::Sobel(orgL, grad_x, CV_32F, 1, 0, 3);
+  cv::Sobel(orgL, grad_y, CV_32F, 0, 1, 3);
+
+  cv::Mat agrad_x = cv::abs(grad_x);
+  cv::Mat agrad_y = cv::abs(grad_y);
+
+  cv::Mat gradxht = agrad_x(cv::Rect(0, 0, cu_w, cu_h2));
+  cv::Mat gradxhb = agrad_x(cv::Rect(0, cu_h2, cu_w, cu_h2));
+  cv::Mat gradxvl = agrad_x(cv::Rect(0, 0, cu_w2, cu_h));
+  cv::Mat gradxvr = agrad_x(cv::Rect(cu_w2, 0, cu_w2, cu_h));
+  cv::Mat gradyht = agrad_y(cv::Rect(0, 0, cu_w, cu_h2));
+  cv::Mat gradyhb = agrad_y(cv::Rect(0, cu_h2, cu_w, cu_h2));
+  cv::Mat gradyvl = agrad_y(cv::Rect(0, 0, cu_w2, cu_h));
+  cv::Mat gradyvr = agrad_y(cv::Rect(cu_w2, 0, cu_w2, cu_h));
+
+  int ngradx   = cv::abs(cv::sum(gradxht)[0] + cv::sum(gradxhb)[0]);
+  int ngrady   = cv::abs(cv::sum(gradyht)[0] + cv::sum(gradyhb)[0]);
+  int ndgradxh = cv::abs(cv::sum(gradxht)[0] - cv::sum(gradxhb)[0]);
+  int ndgradxv = cv::abs(cv::sum(gradxvl)[0] - cv::sum(gradxvr)[0]);
+  int ndgradyh = cv::abs(cv::sum(gradyht)[0] - cv::sum(gradyhb)[0]);
+  int ndgradyv = cv::abs(cv::sum(gradyvl)[0] - cv::sum(gradyvr)[0]);
+  int ndgradx = ndgradxh - ndgradyv;
+  int ndgrady = ndgradyh - ndgradxv;
+
+  cv::Mat Lht = orgL(cv::Rect(0, 0, cu_w, cu_h2));
+  cv::Mat Lhb = orgL(cv::Rect(0, cu_h2, cu_w, cu_h2));
+  cv::Mat Lvl = orgL(cv::Rect(0, 0, cu_w2, cu_h));
+  cv::Mat Lvr = orgL(cv::Rect(cu_w2, 0, cu_w2, cu_h));
+
+  int varht = cal_variance(Lht);
+  int varhb = cal_variance(Lhb);
+  int varvl = cal_variance(Lvl);
+  int varvr = cal_variance(Lvr);
+
+  int ndvarh = abs(varht - varhb);
+  int ndvarv = abs(varvl - varvr);
+  int ndvar = ndvarh - ndvarv;
+ 
+  if (w_over_h)
+  {
+    feature[0] = cs->baseQP;  
+    feature[1] = ngradx;
+    feature[2] = ngrady;
+    feature[3] = ndvar;
+    feature[4] = ndgradx;
+    feature[5] = ndgrady;
+  }
+  else
+  {
+    feature[0] = cs->baseQP;
+    feature[1] = ngrady;
+    feature[2] = ngradx;
+    feature[3] = ndvar;
+    feature[4] = ndgrady;
+    feature[5] = ndgradx;
+  }
+
+  //standards
+  for(int i=0; i<6;i++)
+  {
+    feature[i] = (feature[i] - standard_m[i])/standard_s[i];
+  }
+}
 
 
 //! \ingroup EncoderLib
@@ -674,6 +929,393 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
   }
 
+    #define s_ns  1
+  #define hs_vs 1
+  #define TH    0
+
+//1 : 0000110100  110110
+//2 : 0000110100  000000
+//3 : 0000110100  111110
+
+#if s_ns
+  #define s_ns_64x64   0
+  #define s_ns_32x32   0
+  #define s_ns_16x16   0
+  #define s_ns_8x8     0
+  #define s_ns_32x16   1
+  #define s_ns_32x8    1
+  #define s_ns_32x4    0
+  #define s_ns_16x8    1
+  #define s_ns_16x4    0
+  #define s_ns_8x4     0
+#endif
+
+#if hs_vs
+  #define hs_vs_32x32  1
+  #define hs_vs_32x16  1
+  #define hs_vs_32x8   0
+  #define hs_vs_16x16  1
+  #define hs_vs_16x8   1
+  #define hs_vs_8x8    0
+#endif
+
+  auto startTime  = std::chrono::steady_clock::now();
+
+
+  int cu_w  = partitioner.currArea().lwidth();
+  int cu_h  = partitioner.currArea().lheight();
+  int pos_x = partitioner.currArea().lx();
+  int pos_y = partitioner.currArea().ly();
+ 
+  double sns_label = 1;
+  double hsvs_label = 1;
+
+  bool   sns_flag  = false;
+  bool   hsvs_flag = false;
+  bool   hs_flag      = false;
+  bool   vs_flag      = false;
+  //bool   sns_rdo_flag = false;
+
+  bool canNo, canQt, canBh, canTh, canBv, canTv;
+  bool cansplit = true;
+  partitioner.canSplit(*tempCS, canNo, canQt, canBh, canBv, canTh, canTv);
+  if (!canQt && !canBh && !canBv && !canTh && !canTv)
+    cansplit = false;
+
+  if ((partitioner.chType == CHANNEL_TYPE_LUMA) && (cu_w > 4 || cu_h > 4) && cu_w < 128 && (cu_w + pos_x) <= tempCS->picture->lwidth()
+      && (cu_h + pos_y) <= tempCS->picture->lheight() && !(((cu_w == 64) && (cu_h != 64)) || ((cu_w != 64) && (cu_h == 64)))&& partitioner.currDepth < 6 &&cansplit)
+  {
+    double feature[20] = { 0 };  
+    double th = 0;
+
+    bool w_over_h = true;
+    if (cu_w < cu_h)
+      w_over_h = false;
+
+    enum classifier_type
+    {
+      no,
+
+      sns_64x64,
+      sns_32x32,
+      sns_16x16,
+      sns_8x8,
+      sns_32x16,
+      sns_32x8,
+      sns_32x4,
+      sns_16x8,
+      sns_16x4,
+      sns_8x4,
+
+      hsvs_32x32,
+      hsvs_32x16,
+      hsvs_32x8,
+      hsvs_16x16,
+      hsvs_16x8,
+      hsvs_8x8,
+    };
+    int sns_classifier = no;
+    int hsvs_classifier = no;
+    int feature_num = 0;
+
+    if (cu_w == 64 && cu_h == 64)
+    {
+      #if s_ns_64x64
+      sns_classifier = sns_64x64;
+      #endif
+    }
+    else if (cu_w == 32 && cu_h == 32)
+    {
+      #if s_ns_32x32
+        sns_classifier = sns_32x32;
+      #endif
+      #if hs_vs_32x32
+        hsvs_classifier = hsvs_32x32;
+      #endif
+    }
+    else if (cu_w == 16 && cu_h == 16)
+    {
+      #if s_ns_16x16
+        sns_classifier = sns_16x16;
+      #endif
+      #if hs_vs_16x16
+        hsvs_classifier = hsvs_16x16;
+      #endif
+    }
+    else if (cu_w == 8 && cu_h == 8)
+    {
+      #if s_ns_8x8
+      sns_classifier = sns_8x8;
+      #endif
+      #if s_ns_8x8
+      hsvs_classifier = hsvs_8x8;
+      #endif
+    }
+    else if ((cu_w == 32 && cu_h == 16) || (cu_w == 16 && cu_h == 32))
+    {
+      #if s_ns_32x16
+        sns_classifier = sns_32x16;
+      #endif
+      #if hs_vs_32x16
+        hsvs_classifier = hsvs_32x16;
+      #endif
+    }
+    else if ((cu_w == 32 && cu_h == 8) || ( cu_w == 8 && cu_h == 32))
+    {
+      #if s_ns_32x8
+        sns_classifier = sns_32x8;
+      #endif
+      #if hs_vs_32x8
+        hsvs_classifier = hsvs_32x8;
+      #endif
+    }
+    else if ((cu_w == 32 && cu_h == 4) || (cu_w == 4 && cu_h == 32))
+    {
+      #if s_ns_32x4
+      sns_classifier = sns_32x4;
+      #endif
+    }
+    else if ((cu_w == 16 && cu_h == 8) || (cu_w == 8 && cu_h == 16))
+    {
+      #if s_ns_16x8
+        sns_classifier = sns_16x8;
+      #endif
+      #if hs_vs_16x8
+        hsvs_classifier = hsvs_16x8;
+      #endif
+    }
+    else if ((cu_w == 16 && cu_h == 4) || (cu_w == 4 && cu_h == 16))
+    {
+      #if s_ns_16x4
+       sns_classifier = sns_16x4;
+      #endif
+    }
+     else if ((cu_w == 8 && cu_h == 4) || (cu_w == 4 && cu_h == 8))
+     {
+       #if s_ns_8x4
+       sns_classifier = sns_8x4; 
+       #endif
+     }
+    
+
+    struct svm_model *model = NULL;
+    double *standard_m = NULL;
+    double *standard_s = NULL;
+
+    switch (sns_classifier)
+    {
+    case sns_64x64: 
+      model = m_pcEncCfg->s_ns_64x64_model;
+      standard_m =  sns64x64_mean;
+      standard_s =  sns64x64_std;
+      th = 0.5;
+      break;
+
+    case sns_32x32:
+      model       = m_pcEncCfg->s_ns_32x32_model;
+      standard_m =  sns32x32_mean;
+      standard_s =  sns32x32_std;
+      th = 0.5;
+      break;
+
+    case sns_16x16:
+      model       = m_pcEncCfg->s_ns_16x16_model;
+      standard_m =  sns16x16_mean;
+      standard_s =  sns16x16_std;
+      th = 0.6;
+      break;
+
+    case sns_8x8:
+      model       = m_pcEncCfg->s_ns_8x8_model;
+      standard_m =  sns8x8_mean;
+      standard_s =  sns8x8_std;
+      th = 0.5;
+      break;
+
+    case sns_32x16:
+      model       = m_pcEncCfg->s_ns_32x16_model;
+      standard_m =  sns32x16_mean;
+      standard_s =  sns32x16_std;
+      th = 0.5;
+      break;
+
+    case sns_32x8:
+      model       = m_pcEncCfg->s_ns_32x8_model;
+      standard_m =  sns32x8_mean;
+      standard_s =  sns32x8_std;
+      th = 0.70;
+      break;
+    
+    case sns_32x4:
+      model       = m_pcEncCfg->s_ns_32x4_model;
+      standard_m =  sns32x4_mean;
+      standard_s =  sns32x4_std;
+      th = 0.68;
+      break;
+
+    case sns_16x8:
+      model       = m_pcEncCfg->s_ns_16x8_model;
+      standard_m =  sns16x8_mean;
+      standard_s =  sns16x8_std;
+      th = 0.5;
+      break;
+    
+    case sns_16x4:
+      model       = m_pcEncCfg->s_ns_16x4_model;
+      standard_m =  sns16x4_mean;
+      standard_s =  sns16x4_std;
+      th  = 0.54;
+      break;
+
+    case sns_8x4:
+      model       = m_pcEncCfg->s_ns_8x4_model;
+      standard_m =  sns8x4_mean;
+      standard_s =  sns8x4_std;
+      th = 0.81;
+      break;
+
+    default: 
+      sns_classifier = no;
+      break;
+    }
+
+    #if !TH
+      th = 0.1;
+    #endif
+
+    if(sns_classifier)
+    {
+      cal_feature_sns(partitioner, tempCS, feature, standard_m, standard_s, w_over_h); 
+      feature_num = 8;
+      int max_feature_num = 10;
+      double *prob_estimates = NULL;    
+      struct svm_node *x = NULL;        
+
+      prob_estimates = (double *) malloc(2 * sizeof(double));
+      x = (struct svm_node *) realloc(x, max_feature_num * sizeof(struct svm_node));   // allocate memory for x
+
+      for (int i = 0; i < feature_num; i++)
+      {
+        x[i].index = i + 1;
+        x[i].value = feature[i];
+      }
+      x[feature_num].index = -1;
+      sns_label = svm_predict_probability(model, x, prob_estimates);
+
+      if ((prob_estimates[0] >= th) || (prob_estimates[0] < (1 - th)))
+      {
+        sns_flag = true;
+      }
+      // else
+      //   sns_rdo_flag = true;
+      //if (cu_w == 32 && cu_h == 32)
+      //printf("sns: %d,%d,%d,%d,%g,%g,%g\n", pos_x, pos_y, cu_w, cu_h, sns_label, prob_estimates[0], prob_estimates[1]);
+    }
+
+    //if (((!s_ns) ||(s_ns&&((sns_label&&sns_flag)/*||sns_rdo_flag*/))))
+    if(hs_vs)
+    {
+      switch (hsvs_classifier)
+      {
+      case hsvs_32x32:
+        model       = m_pcEncCfg->hs_vs_32x32_model;
+        standard_m =  hsvs32x32_mean;
+        standard_s =  hsvs32x32_std;
+        th  = 0.52;
+        break;
+      
+      case hsvs_32x16:
+        model       = m_pcEncCfg->hs_vs_32x16_model;
+        standard_m =  hsvs32x16_mean;
+        standard_s =  hsvs32x16_std;
+        th  = 0.51;
+        break;
+
+      case hsvs_32x8:
+        model       = m_pcEncCfg->hs_vs_32x8_model;
+        standard_m =  hsvs32x8_mean;
+        standard_s =  hsvs32x8_std;
+        th  = 0.53;
+        break;
+      
+      case hsvs_16x16:
+        model       = m_pcEncCfg->hs_vs_16x16_model;
+        standard_m =  hsvs16x16_mean;
+        standard_s =  hsvs16x16_std;
+        th  = 0.56;
+        break;
+      
+      case hsvs_16x8:
+        model       = m_pcEncCfg->hs_vs_16x8_model;
+        standard_m =  hsvs16x8_mean;
+        standard_s =  hsvs16x8_std;
+        th  = 0.60;
+        break;
+      
+      case hsvs_8x8:
+        model       = m_pcEncCfg->hs_vs_8x8_model;
+        standard_m =  hsvs8x8_mean;
+        standard_s =  hsvs8x8_std;
+        th  = 0.63;
+        break;
+      
+      default:
+        break;
+      }
+
+      #if !TH
+      th = 0.1;
+      #endif
+
+      if(hsvs_classifier)
+      {
+        cal_feature_hsvs(partitioner, tempCS, feature, standard_m, standard_s, w_over_h);
+        feature_num = 6;
+        int max_feature_num = 10;
+        double *prob_estimates = NULL;    
+        struct svm_node *x = NULL;        
+
+        prob_estimates = (double *) malloc(2 * sizeof(double));
+        x = (struct svm_node *) realloc(x, max_feature_num * sizeof(struct svm_node));   // allocate memory for x
+
+        for (int i = 0; i < feature_num; i++)
+        {
+          x[i].index = i + 1;
+          x[i].value = feature[i];
+        }
+        x[feature_num].index = -1;
+        hsvs_label = svm_predict_probability(model, x, prob_estimates);
+        if(hsvs_label == 100)
+          hs_flag = true;
+        else
+          vs_flag = true;
+          
+
+        if((prob_estimates[0] > th) || (prob_estimates[0] < (1-th)))
+        {        
+          hsvs_flag = true;
+        }
+
+        //if (cu_w == 32 && cu_h == 32)
+        //printf("hsvs: %d,%d,%d,%d,%d,%g,%g\n", pos_x, pos_y, cu_w, cu_h, vs_flag, prob_estimates[0], prob_estimates[1]);
+        }
+    }
+
+  }
+
+  auto endTime = std::chrono::steady_clock::now();
+  SvmTime += std::chrono::duration_cast<std::chrono::microseconds>( endTime - startTime).count();
+
+  bool cureuse = false;
+  EncTestMode currTestM = m_modeCtrl->currTestMode();
+  if(partitioner.chType == CHANNEL_TYPE_LUMA&&currTestM.type != ETM_INTRA&&(!sns_label && sns_flag))
+  {
+    cureuse = true;
+    //if (cu_w == 32 && cu_h == 32)
+    //printf("CUreuse\n");
+  }
+  //cureuse = false;
+
   do
   {
     for (int i = compBegin; i < (compBegin + numComp); i++)
@@ -769,40 +1411,42 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     {
       xCheckRDCostMergeGeo2Nx2N( tempCS, bestCS, partitioner, currTestMode );
     }
-    else if( currTestMode.type == ETM_INTRA )
+    else if( currTestMode.type == ETM_INTRA||cureuse)
     {
-      if (slice.getSPS()->getUseColorTrans() && !CS::isDualITree(*tempCS))
-      {
-        bool skipSecColorSpace = false;
-        skipSecColorSpace = xCheckRDCostIntra(tempCS, bestCS, partitioner, currTestMode, (m_pcEncCfg->getRGBFormatFlag() ? true : false));
-        if ((m_pcEncCfg->getCostMode() == COST_LOSSLESS_CODING && slice.isLossless()) && !m_pcEncCfg->getRGBFormatFlag())
+      if((!sns_label || !sns_flag)){
+        if (slice.getSPS()->getUseColorTrans() && !CS::isDualITree(*tempCS))
         {
-          skipSecColorSpace = true;
-        }
-        if (!skipSecColorSpace && !tempCS->firstColorSpaceTestOnly)
-        {
-          xCheckRDCostIntra(tempCS, bestCS, partitioner, currTestMode, (m_pcEncCfg->getRGBFormatFlag() ? false : true));
-        }
-
-        if (!tempCS->firstColorSpaceTestOnly)
-        {
-          if (tempCS->tmpColorSpaceIntraCost[0] != MAX_DOUBLE && tempCS->tmpColorSpaceIntraCost[1] != MAX_DOUBLE)
+          bool skipSecColorSpace = false;
+          skipSecColorSpace = xCheckRDCostIntra(tempCS, bestCS, partitioner, currTestMode, (m_pcEncCfg->getRGBFormatFlag() ? true : false));
+          if ((m_pcEncCfg->getCostMode() == COST_LOSSLESS_CODING && slice.isLossless()) && !m_pcEncCfg->getRGBFormatFlag())
           {
-            double skipCostRatio = m_pcEncCfg->getRGBFormatFlag() ? 1.1 : 1.0;
-            if (tempCS->tmpColorSpaceIntraCost[1] > (skipCostRatio*tempCS->tmpColorSpaceIntraCost[0]))
+            skipSecColorSpace = true;
+          }
+          if (!skipSecColorSpace && !tempCS->firstColorSpaceTestOnly)
+          {
+            xCheckRDCostIntra(tempCS, bestCS, partitioner, currTestMode, (m_pcEncCfg->getRGBFormatFlag() ? false : true));
+          }
+
+          if (!tempCS->firstColorSpaceTestOnly)
+          {
+            if (tempCS->tmpColorSpaceIntraCost[0] != MAX_DOUBLE && tempCS->tmpColorSpaceIntraCost[1] != MAX_DOUBLE)
             {
-              tempCS->firstColorSpaceTestOnly = bestCS->firstColorSpaceTestOnly = true;
+              double skipCostRatio = m_pcEncCfg->getRGBFormatFlag() ? 1.1 : 1.0;
+              if (tempCS->tmpColorSpaceIntraCost[1] > (skipCostRatio*tempCS->tmpColorSpaceIntraCost[0]))
+              {
+                tempCS->firstColorSpaceTestOnly = bestCS->firstColorSpaceTestOnly = true;
+              }
             }
+          }
+          else
+          {
+            CHECK(tempCS->tmpColorSpaceIntraCost[1] != MAX_DOUBLE, "the RD test of the second color space should be skipped");
           }
         }
         else
         {
-          CHECK(tempCS->tmpColorSpaceIntraCost[1] != MAX_DOUBLE, "the RD test of the second color space should be skipped");
+          xCheckRDCostIntra(tempCS, bestCS, partitioner, currTestMode, false);
         }
-      }
-      else
-      {
-        xCheckRDCostIntra(tempCS, bestCS, partitioner, currTestMode, false);
       }
     }
     else if (currTestMode.type == ETM_PALETTE)
@@ -819,76 +1463,88 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
     else if( isModeSplit( currTestMode ) )
     {
-      if (bestCS->cus.size() != 0)
-      {
-        splitmode = bestCS->cus[0]->splitSeries;
-      }
-      assert( partitioner.modeType == tempCS->modeType );
-      int signalModeConsVal = tempCS->signalModeCons( getPartSplit( currTestMode ), partitioner, modeTypeParent );
-      int numRoundRdo = signalModeConsVal == LDT_MODE_TYPE_SIGNAL ? 2 : 1;
-      bool skipInterPass = false;
-      for( int i = 0; i < numRoundRdo; i++ )
-      {
-        //change cons modes
-        if( signalModeConsVal == LDT_MODE_TYPE_SIGNAL )
+      if(sns_label || !sns_flag/*||currTestMode.type == ETM_SPLIT_QT*/){
+        bool hv_split_flag = true;
+        if(hsvs_flag)
         {
-          CHECK( numRoundRdo != 2, "numRoundRdo shall be 2 - [LDT_MODE_TYPE_SIGNAL]" );
-          tempCS->modeType = partitioner.modeType = (i == 0) ? MODE_TYPE_INTER : MODE_TYPE_INTRA;
+          if((currTestMode.type == ETM_SPLIT_BT_H || currTestMode.type == ETM_SPLIT_TT_H) && vs_flag)
+            hv_split_flag = false;
+          if((currTestMode.type == ETM_SPLIT_BT_V || currTestMode.type == ETM_SPLIT_TT_V) && hs_flag)
+            hv_split_flag = false;
         }
-        else if( signalModeConsVal == LDT_MODE_TYPE_INFER )
-        {
-          CHECK( numRoundRdo != 1, "numRoundRdo shall be 1 - [LDT_MODE_TYPE_INFER]" );
-          tempCS->modeType = partitioner.modeType = MODE_TYPE_INTRA;
-        }
-        else if( signalModeConsVal == LDT_MODE_TYPE_INHERIT )
-        {
-          CHECK( numRoundRdo != 1, "numRoundRdo shall be 1 - [LDT_MODE_TYPE_INHERIT]" );
-          tempCS->modeType = partitioner.modeType = modeTypeParent;
-        }
-
-        //for lite intra encoding fast algorithm, set the status to save inter coding info
-        if( modeTypeParent == MODE_TYPE_ALL && tempCS->modeType == MODE_TYPE_INTER )
-        {
-          m_pcIntraSearch->setSaveCuCostInSCIPU( true );
-          m_pcIntraSearch->setNumCuInSCIPU( 0 );
-        }
-        else if( modeTypeParent == MODE_TYPE_ALL && tempCS->modeType != MODE_TYPE_INTER )
-        {
-          m_pcIntraSearch->setSaveCuCostInSCIPU( false );
-          if( tempCS->modeType == MODE_TYPE_ALL )
+        if(hv_split_flag){
+          if (bestCS->cus.size() != 0)
           {
-            m_pcIntraSearch->setNumCuInSCIPU( 0 );
+            splitmode = bestCS->cus[0]->splitSeries;
           }
-        }
-
-        xCheckModeSplit( tempCS, bestCS, partitioner, currTestMode, modeTypeParent, skipInterPass );
-        //recover cons modes
-        tempCS->modeType = partitioner.modeType = modeTypeParent;
-        tempCS->treeType = partitioner.treeType = treeTypeParent;
-        partitioner.chType = chTypeParent;
-        if( modeTypeParent == MODE_TYPE_ALL )
-        {
-          m_pcIntraSearch->setSaveCuCostInSCIPU( false );
-          if( numRoundRdo == 2 && tempCS->modeType == MODE_TYPE_INTRA )
+          assert( partitioner.modeType == tempCS->modeType );
+          int signalModeConsVal = tempCS->signalModeCons( getPartSplit( currTestMode ), partitioner, modeTypeParent );
+          int numRoundRdo = signalModeConsVal == LDT_MODE_TYPE_SIGNAL ? 2 : 1;
+          bool skipInterPass = false;
+          for( int i = 0; i < numRoundRdo; i++ )
           {
-            m_pcIntraSearch->initCuAreaCostInSCIPU();
+            //change cons modes
+            if( signalModeConsVal == LDT_MODE_TYPE_SIGNAL )
+            {
+              CHECK( numRoundRdo != 2, "numRoundRdo shall be 2 - [LDT_MODE_TYPE_SIGNAL]" );
+              tempCS->modeType = partitioner.modeType = (i == 0) ? MODE_TYPE_INTER : MODE_TYPE_INTRA;
+            }
+            else if( signalModeConsVal == LDT_MODE_TYPE_INFER )
+            {
+              CHECK( numRoundRdo != 1, "numRoundRdo shall be 1 - [LDT_MODE_TYPE_INFER]" );
+              tempCS->modeType = partitioner.modeType = MODE_TYPE_INTRA;
+            }
+            else if( signalModeConsVal == LDT_MODE_TYPE_INHERIT )
+            {
+              CHECK( numRoundRdo != 1, "numRoundRdo shall be 1 - [LDT_MODE_TYPE_INHERIT]" );
+              tempCS->modeType = partitioner.modeType = modeTypeParent;
+            }
+
+            //for lite intra encoding fast algorithm, set the status to save inter coding info
+            if( modeTypeParent == MODE_TYPE_ALL && tempCS->modeType == MODE_TYPE_INTER )
+            {
+              m_pcIntraSearch->setSaveCuCostInSCIPU( true );
+              m_pcIntraSearch->setNumCuInSCIPU( 0 );
+            }
+            else if( modeTypeParent == MODE_TYPE_ALL && tempCS->modeType != MODE_TYPE_INTER )
+            {
+              m_pcIntraSearch->setSaveCuCostInSCIPU( false );
+              if( tempCS->modeType == MODE_TYPE_ALL )
+              {
+                m_pcIntraSearch->setNumCuInSCIPU( 0 );
+              }
+            }
+
+            xCheckModeSplit( tempCS, bestCS, partitioner, currTestMode, modeTypeParent, skipInterPass );
+            //recover cons modes
+            tempCS->modeType = partitioner.modeType = modeTypeParent;
+            tempCS->treeType = partitioner.treeType = treeTypeParent;
+            partitioner.chType = chTypeParent;
+            if( modeTypeParent == MODE_TYPE_ALL )
+            {
+              m_pcIntraSearch->setSaveCuCostInSCIPU( false );
+              if( numRoundRdo == 2 && tempCS->modeType == MODE_TYPE_INTRA )
+              {
+                m_pcIntraSearch->initCuAreaCostInSCIPU();
+              }
+            }
+            if( skipInterPass )
+            {
+              break;
+            }
           }
-        }
-        if( skipInterPass )
-        {
-          break;
-        }
-      }
-      if (splitmode != bestCS->cus[0]->splitSeries)
-      {
-        splitmode = bestCS->cus[0]->splitSeries;
-        const CodingUnit&     cu = *bestCS->cus.front();
-        cu.cs->prevPLT = bestCS->prevPLT;
-        for (int i = compBegin; i < (compBegin + numComp); i++)
-        {
-          ComponentID comID = jointPLT ? (ComponentID)compBegin : ((i > 0) ? COMPONENT_Cb : COMPONENT_Y);
-          bestLastPLTSize[comID] = bestCS->cus[0]->cs->prevPLT.curPLTSize[comID];
-          memcpy(bestLastPLT[i], bestCS->cus[0]->cs->prevPLT.curPLT[i], bestCS->cus[0]->cs->prevPLT.curPLTSize[comID] * sizeof(Pel));
+          if (splitmode != bestCS->cus[0]->splitSeries)
+          {
+            splitmode = bestCS->cus[0]->splitSeries;
+            const CodingUnit&     cu = *bestCS->cus.front();
+            cu.cs->prevPLT = bestCS->prevPLT;
+            for (int i = compBegin; i < (compBegin + numComp); i++)
+            {
+              ComponentID comID = jointPLT ? (ComponentID)compBegin : ((i > 0) ? COMPONENT_Cb : COMPONENT_Y);
+              bestLastPLTSize[comID] = bestCS->cus[0]->cs->prevPLT.curPLTSize[comID];
+              memcpy(bestLastPLT[i], bestCS->cus[0]->cs->prevPLT.curPLT[i], bestCS->cus[0]->cs->prevPLT.curPLTSize[comID] * sizeof(Pel));
+            }
+          }
         }
       }
     }
