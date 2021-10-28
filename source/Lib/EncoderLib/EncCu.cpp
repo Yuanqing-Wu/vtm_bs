@@ -53,7 +53,9 @@
 #include <cmath>
 #include <algorithm>
 
-
+#include <opencv2/opencv.hpp>
+#include <unistd.h>
+#include <fstream>
 
 //! \ingroup EncoderLib
 //! \{
@@ -672,6 +674,87 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     {
       tempCS->firstColorSpaceTestOnly = bestCS->firstColorSpaceTestOnly = true;
     }
+  }
+
+  if (isLuma(partitioner.chType) 
+    && partitioner.currArea().lwidth() == 32 && partitioner.currArea().lheight() == 32 
+    && (partitioner.currArea().lwidth() + partitioner.currArea().lx()) <= tempCS->picture->lwidth()
+    && (partitioner.currArea().lheight() + partitioner.currArea().ly()) <= tempCS->picture->lheight())
+  {
+    int w = partitioner.currArea().lwidth();
+    int h = partitioner.currArea().lheight();
+    static int num = 0;
+
+    CodingUnit &planarCU = tempCS->addCU( CS::getArea( *tempCS, tempCS->area, partitioner.chType ), partitioner.chType );
+
+    partitioner.setCUData( planarCU );
+
+    planarCU.slice            = tempCS->slice;
+    planarCU.tileIdx          = tempCS->pps->getTileIdx( tempCS->area.lumaPos() );
+    planarCU.predMode         = MODE_INTRA;
+
+    CU::addPUs( planarCU );
+
+    CHECK( !planarCU.firstPU, "CU has no PUs" );
+    auto &pu = *planarCU.firstPU;
+    CHECK(pu.cu != &planarCU, "PU is not contained in the CU");
+    CHECK(!pu.Y().valid(), "PU is not valid");
+
+    pu.multiRefIdx            = 0;
+    m_pcIntraSearch->initIntraPatternChType(planarCU, pu.Y(), true);
+
+    const int srcStride  = m_pcIntraSearch->m_refBufferStride[COMPONENT_Y];
+    const int srcHStride = 2;
+
+    const CPelBuf & srcBuf = CPelBuf(m_pcIntraSearch->getPredictorPtr(COMPONENT_Y), srcStride, srcHStride);
+    PelBuf piPred = tempCS->getPredBuf(pu.Y());
+    m_pcIntraSearch->xPredIntraPlanar(srcBuf, piPred);
+
+    CPelBuf orgLuma = tempCS->picture->getTrueOrigBuf(partitioner.currArea().blocks[COMPONENT_Y]);
+    cv::Mat orgL = cv::Mat(h, w, CV_16UC1);
+    cv::Mat preL = cv::Mat(h, w, CV_16UC1);
+
+    for( int i = 0; i < h; ++i )
+    {
+      memcpy(orgL.data + sizeof(short) * w  * i, orgLuma.buf + orgLuma.stride * i , sizeof(short) * w);
+      memcpy(preL.data + sizeof(short) * w  * i, piPred.buf + piPred.stride * i , sizeof(short) * w);
+    }
+
+    // orgL.convertTo(orgL, CV_8UC1, 0.25, 0);
+    // preL.convertTo(preL, CV_8UC1, 0.25, 0);
+
+    std::string filePath = m_pcEncCfg->getOutputFileName();
+    filePath.erase(filePath.end() - 4, filePath.end());
+    if (access(filePath.c_str(), 0) == -1){
+      std::string cmd = "mkdir " + filePath;
+      if(system(cmd.c_str()) == -1) throw "Craet file folder fail!";
+    }
+
+    char orgNum[20];
+    char preNum[20];
+    snprintf ( orgNum, 20, "/%08dorg.yuv", num);
+    snprintf ( preNum, 20, "/%08dpre.yuv", num);
+    std::string orgfilePath = filePath + orgNum;
+    std::string prefilePath = filePath + preNum;
+
+    std::vector<int> compression_params;
+    compression_params.push_back(cv::IMWRITE_PNG_COMPRESSION);
+    compression_params.push_back(9);
+
+    cv::Mat image;
+    std::fstream writeY;
+
+    orgL.convertTo(image, CV_8UC1, 0.25, 0);
+    writeY.open(orgfilePath, std::ios::out | std::ios::binary);
+    writeY.write(reinterpret_cast<char*>(image.data), w*h);
+    writeY.close();
+
+    preL.convertTo(image, CV_8UC1, 0.25, 0);
+    writeY.open(prefilePath, std::ios::out | std::ios::binary);
+    writeY.write(reinterpret_cast<char*>(image.data), w*h);
+    writeY.close();
+
+    num++;
   }
 
   do

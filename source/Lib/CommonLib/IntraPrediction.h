@@ -67,7 +67,6 @@ class IntraPrediction
 {
 protected:
   Pel      m_refBuffer[MAX_NUM_COMPONENT][NUM_PRED_BUF][(MAX_CU_SIZE * 2 + 1 + MAX_REF_LINE_IDX) * 2];
-  uint32_t m_refBufferStride[MAX_NUM_COMPONENT];
 
 private:
 
@@ -118,7 +117,6 @@ protected:
   ScanElement* m_scanOrder;
   bool         m_bestScanRotationMode;
   // prediction
-  void xPredIntraPlanar           ( const CPelBuf &pSrc, PelBuf &pDst );
   void xPredIntraDc               ( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const bool enableBoundaryFilter = true );
   void xPredIntraAng              ( const CPelBuf &pSrc, PelBuf &pDst, const ChannelType channelType, const ClpRng& clpRng);
 
@@ -141,6 +139,8 @@ protected:
 
   void xGetLMParameters(const PredictionUnit &pu, const ComponentID compID, const CompArea& chromaArea, int& a, int& b, int& iShift);
 public:
+  uint32_t m_refBufferStride[MAX_NUM_COMPONENT];
+  void xPredIntraPlanar           ( const CPelBuf &pSrc, PelBuf &pDst );
   IntraPrediction();
   virtual ~IntraPrediction();
 

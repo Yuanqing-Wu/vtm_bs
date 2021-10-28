@@ -52,8 +52,11 @@ else()
   target_compile_definitions( ${LIB_NAME} PUBLIC ENABLE_WPP_PARALLELISM=0 )
 endif()
 
+find_package (OpenCV REQUIRED)
+include_directories (${OpenCV_INCLUDE_DIRS})
+
 target_include_directories( ${LIB_NAME} PUBLIC . )
-target_link_libraries( ${LIB_NAME} CommonLib Threads::Threads )
+target_link_libraries( ${LIB_NAME} CommonLib Threads::Threads ${OpenCV_LIBS})
 
 if( CMAKE_COMPILER_IS_GNUCC )
   # this is quite certainly a compiler problem

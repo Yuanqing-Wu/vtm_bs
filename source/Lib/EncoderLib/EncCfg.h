@@ -158,6 +158,7 @@ class EncCfg
 {
 protected:
   //==== File I/O ========
+  std::string    m_outputFileName;
   int       m_iFrameRate;
   int       m_FrameSkip;
   uint32_t      m_temporalSubsampleRatio;
@@ -945,7 +946,8 @@ public:
   bool      getNoApsConstraintFlag() const { return m_noApsConstraintFlag; }
   void      setNoApsConstraintFlag(bool val) { m_noApsConstraintFlag = val; }
 
-
+  void      setOutputFileName               ( std::string fileName) { m_outputFileName = fileName; }
+  std::string      getOutputFileName()                              { return m_outputFileName; }
   void      setFrameRate                    ( int   i )      { m_iFrameRate = i; }
   void      setFrameSkip                    ( uint32_t  i )      { m_FrameSkip = i; }
   void      setTemporalSubsampleRatio       ( uint32_t  i )      { m_temporalSubsampleRatio = i; }
