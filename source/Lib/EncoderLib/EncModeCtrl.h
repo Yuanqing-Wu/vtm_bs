@@ -571,6 +571,7 @@ class EncModeCtrlMTnoRQT : public EncModeCtrl, public CacheBlkInfoCtrl
     DID_HORZ_SPLIT = 0,
     DID_VERT_SPLIT,
     DID_QUAD_SPLIT,
+    BEST_QT_SPLIT_COST,
     BEST_HORZ_SPLIT_COST,
     BEST_VERT_SPLIT_COST,
     BEST_TRIH_SPLIT_COST,

@@ -2063,6 +2063,7 @@ bool EncModeCtrlMTnoRQT::useModeResult( const EncTestMode& encTestmode, CodingSt
 
   if( encTestmode.type == ETM_SPLIT_QT )
   {
+    cuECtx.set( BEST_QT_SPLIT_COST, tempCS->cost );
     int maxQtD = 0;
     for( const auto& cu : tempCS->cus )
     {
