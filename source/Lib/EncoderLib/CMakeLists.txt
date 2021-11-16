@@ -53,9 +53,11 @@ else()
 endif()
 
 find_package(Torch REQUIRED)
+find_package (OpenCV REQUIRED)
+include_directories (${OpenCV_INCLUDE_DIRS})
 
 target_include_directories( ${LIB_NAME} PUBLIC . )
-target_link_libraries( ${LIB_NAME} CommonLib Threads::Threads "${TORCH_LIBRARIES}")
+target_link_libraries( ${LIB_NAME} CommonLib Threads::Threads ${OpenCV_LIBS} "${TORCH_LIBRARIES}")
 
 if( CMAKE_COMPILER_IS_GNUCC )
   # this is quite certainly a compiler problem

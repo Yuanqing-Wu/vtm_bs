@@ -54,6 +54,7 @@
 #include <algorithm>
 
 #include <torch/script.h>
+#include <opencv2/opencv.hpp>
 
 //! \ingroup EncoderLib
 //! \{
@@ -674,16 +675,96 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
   }
 
-  torch::jit::script::Module module;
-  try {
-    // Deserialize the ScriptModule from a file using torch::jit::load().
-    module = torch::jit::load("/home/wgq/research/bs/cnn/model/model_epoch300.pt");
-  }
-  catch (const c10::Error& e) {
-    std::cerr << "error loading the model\n";
-  }
+  // My code
+  if (isLuma(partitioner.chType)
+    && partitioner.currArea().lwidth() == 32 && partitioner.currArea().lheight() == 32
+    && (partitioner.currArea().lwidth() + partitioner.currArea().lx()) <= tempCS->picture->lwidth()
+    && (partitioner.currArea().lheight() + partitioner.currArea().ly()) <= tempCS->picture->lheight())
+  {
+    int w = partitioner.currArea().lwidth();
+    int h = partitioner.currArea().lheight();
 
-  std::cout << "ok\n";
+    CodingUnit &planarCU = tempCS->addCU( CS::getArea( *tempCS, tempCS->area, partitioner.chType ), partitioner.chType );
+
+    partitioner.setCUData( planarCU );
+
+    planarCU.slice            = tempCS->slice;
+    planarCU.tileIdx          = tempCS->pps->getTileIdx( tempCS->area.lumaPos() );
+    planarCU.predMode         = MODE_INTRA;
+
+    CU::addPUs( planarCU );
+
+    CHECK( !planarCU.firstPU, "CU has no PUs" );
+    auto &pu = *planarCU.firstPU;
+    CHECK(pu.cu != &planarCU, "PU is not contained in the CU");
+    CHECK(!pu.Y().valid(), "PU is not valid");
+
+    pu.multiRefIdx            = 0;
+    m_pcIntraSearch->initIntraPatternChType(planarCU, pu.Y(), true);
+
+    const int srcStride  = m_pcIntraSearch->m_refBufferStride[COMPONENT_Y];
+    const int srcHStride = 2;
+
+    const CPelBuf & srcBuf = CPelBuf(m_pcIntraSearch->getPredictorPtr(COMPONENT_Y), srcStride, srcHStride);
+    PelBuf piPred = tempCS->getPredBuf(pu.Y());
+    m_pcIntraSearch->xPredIntraPlanar(srcBuf, piPred);
+
+    CPelBuf orgLuma = tempCS->picture->getTrueOrigBuf(partitioner.currArea().blocks[COMPONENT_Y]);
+    cv::Mat orgL = cv::Mat(h, w, CV_16UC1);
+    cv::Mat preL = cv::Mat(h, w, CV_16UC1);
+
+    for( int i = 0; i < h; ++i )
+    {
+      memcpy(orgL.data + sizeof(short) * w  * i, orgLuma.buf + orgLuma.stride * i , sizeof(short) * w);
+      memcpy(preL.data + sizeof(short) * w  * i, piPred.buf + piPred.stride * i , sizeof(short) * w);
+    }
+    // cout<<"orgL="<<orgL<<endl;
+    // orgL.convertTo(orgL, CV_8UC1, 0.25, 0);
+    // preL.convertTo(preL, CV_8UC1, 0.25, 0);
+    // cout<<"orgL="<<orgL<<endl;
+    orgL.convertTo(orgL, CV_32FC1, 0.25f/127.5f, 0);
+    preL.convertTo(preL, CV_32FC1, 0.25f/127.5f, 0);
+    cout<<"orgL="<<orgL<<endl;
+
+    torch::jit::script::Module module;
+    try {
+        // Deserialize the ScriptModule from a file using torch::jit::load().
+        module = torch::jit::load("/home/wgq/research/bs/cnn/model/model_epoch600.pt");
+    }
+    catch (const c10::Error& e) {
+        std::cerr << "error loading the model\n";
+    }
+
+    // auto input_tensor = torch::from_blob(frame.data, {1, frame_h, frame_w, kCHANNELS});
+    auto orgL_tensor = torch::from_blob(orgL.data, {1, 32, 32, 1}).to(torch::kFloat32);
+    auto preL_tensor = torch::from_blob(preL.data, {1, 32, 32, 1}).to(torch::kFloat32);
+    std::cout << orgL_tensor.slice(/*dim=*/2, /*start=*/0, /*end=*/32) << '\n';
+    orgL_tensor = orgL_tensor.permute({0, 3, 1, 2});
+    preL_tensor = preL_tensor.permute({0, 3, 1, 2});
+    orgL_tensor = orgL_tensor - 1;
+    preL_tensor = preL_tensor - 1;
+
+    auto qp = torch::ones({1, 1}).to(torch::kFloat32);
+    qp = qp*tempCS->baseQP;
+
+    // torch::Tensor imageBatch = torch::ones({1, 1, 32, 32});
+    // torch::Tensor predBatch = torch::ones({1, 1, 32, 32});
+    // torch::Tensor qp = torch::ones({1});
+
+    //std::cout << orgL_tensor.slice(/*dim=*/2, /*start=*/0, /*end=*/32) << '\n';
+
+    std::vector<torch::jit::IValue> input;
+    input.push_back(orgL_tensor);
+    input.push_back(preL_tensor);
+    input.push_back(qp);
+
+    torch::NoGradGuard no_grad_guard;
+    torch::globalContext().setFlushDenormal(true);
+
+    at::Tensor output = module.forward(input).toTensor();
+    output = output.softmax(1);
+    std::cout << output.slice(/*dim=*/1, /*start=*/0, /*end=*/2) << '\n';
+  }
 
   do
   {
