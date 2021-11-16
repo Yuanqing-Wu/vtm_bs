@@ -981,6 +981,56 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
   } while( m_modeCtrl->nextMode( *tempCS, partitioner ) );
 
+  if (isLuma(partitioner.chType) 
+    && partitioner.currArea().lwidth() == 32 && partitioner.currArea().lheight() == 32 
+    && (partitioner.currArea().lwidth() + partitioner.currArea().lx()) <= tempCS->picture->lwidth()
+    && (partitioner.currArea().lheight() + partitioner.currArea().ly()) <= tempCS->picture->lheight())
+  {
+    FILE *dataFile = NULL;
+    std::string filePath = m_pcEncCfg->getOutputFileName();
+    filePath.erase(filePath.end() - 4, filePath.end());
+
+    filePath = filePath + ".csv";
+    dataFile = fopen(filePath.c_str(), "a");
+
+    const ComprCUCtx& cuECtx = m_modeCtrl->getComprCUCtx();
+
+    fprintf(dataFile, "%d,%d,%d,%d,%d,%d,", tempCS->picture->getPOC(), partitioner.currArea().lx(), partitioner.currArea().ly(), 
+      partitioner.currArea().lwidth(), partitioner.currArea().lheight(), tempCS->baseQP);
+
+    if(cuECtx.extraFeaturesd[10]!=MAX_DOUBLE)
+      fprintf(dataFile, "%f,", cuECtx.extraFeaturesd[10]);
+    else
+      fprintf(dataFile, "%d,", -1);
+
+    if(cuECtx.extraFeaturesd[3]!=MAX_DOUBLE)
+      fprintf(dataFile, "%f,", cuECtx.extraFeaturesd[3]);
+    else
+      fprintf(dataFile, "%d,", -1);
+
+    if(cuECtx.extraFeaturesd[4]!=MAX_DOUBLE)
+      fprintf(dataFile, "%f,", cuECtx.extraFeaturesd[4]);
+    else
+      fprintf(dataFile, "%d,", -1);
+
+    if(cuECtx.extraFeaturesd[5]!=MAX_DOUBLE)
+      fprintf(dataFile, "%f,", cuECtx.extraFeaturesd[5]);
+    else
+      fprintf(dataFile, "%d,", -1);
+
+    if(cuECtx.extraFeaturesd[6]!=MAX_DOUBLE)
+      fprintf(dataFile, "%f,", cuECtx.extraFeaturesd[6]);
+    else
+      fprintf(dataFile, "%d,", -1);
+
+    if(cuECtx.extraFeaturesd[7]!=MAX_DOUBLE)
+      fprintf(dataFile, "%f,", cuECtx.extraFeaturesd[7]);
+    else
+      fprintf(dataFile, "%d,", -1);
+
+    fprintf(dataFile, "%f\n", bestCS->cost);
+    fclose(dataFile);
+  }
 
   //////////////////////////////////////////////////////////////////////////
   // Finishing CU
