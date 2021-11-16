@@ -37,7 +37,7 @@ if( CMAKE_COMPILER_IS_GNUCC )
 endif()
 
 # set c++11
-set( CMAKE_CXX_STANDARD 11 )
+set( CMAKE_CXX_STANDARD 14 )
 set( CMAKE_CXX_STANDARD_REQUIRED ON )
 
 # compile everything position independent (even static libraries)
@@ -61,7 +61,7 @@ if( OpenMP_FOUND )
   set( CMAKE_C_FLAGS          "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}" )
   set( CMAKE_CXX_FLAGS        "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}" )
   set( CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}" )
-  
+
   set( SET_ENABLE_SPLIT_PARALLELISM OFF CACHE BOOL "Set ENABLE_SPLIT_PARALLELISM as a compiler flag" )
   set( ENABLE_SPLIT_PARALLELISM     OFF CACHE BOOL "If SET_ENABLE_SPLIT_PARALLELISM is on, it will be set to this value" )
   set( SET_ENABLE_WPP_PARALLELISM   OFF CACHE BOOL "Set ENABLE_WPP_PARALLELISM as a compiler flag" )

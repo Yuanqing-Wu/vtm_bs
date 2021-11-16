@@ -53,7 +53,7 @@
 #include <cmath>
 #include <algorithm>
 
-
+#include <torch/script.h>
 
 //! \ingroup EncoderLib
 //! \{
@@ -673,6 +673,17 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       tempCS->firstColorSpaceTestOnly = bestCS->firstColorSpaceTestOnly = true;
     }
   }
+
+  torch::jit::script::Module module;
+  try {
+    // Deserialize the ScriptModule from a file using torch::jit::load().
+    module = torch::jit::load("/home/wgq/research/bs/cnn/model/model_epoch300.pt");
+  }
+  catch (const c10::Error& e) {
+    std::cerr << "error loading the model\n";
+  }
+
+  std::cout << "ok\n";
 
   do
   {
@@ -1941,7 +1952,7 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 void EncCu::xCheckPLT(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode)
 {
   if (((partitioner.currArea().lumaSize().width * partitioner.currArea().lumaSize().height <= 16) && (isLuma(partitioner.chType)) )
-        || ((partitioner.currArea().chromaSize().width * partitioner.currArea().chromaSize().height <= 16) && (!isLuma(partitioner.chType)) && partitioner.isSepTree(*tempCS) ) 
+        || ((partitioner.currArea().chromaSize().width * partitioner.currArea().chromaSize().height <= 16) && (!isLuma(partitioner.chType)) && partitioner.isSepTree(*tempCS) )
       || (partitioner.isLocalSepTree(*tempCS)  && (!isLuma(partitioner.chType))  )  )
   {
     return;
