@@ -49,11 +49,16 @@
 
 #include "EncCfgParam.h"
 
+#include <torch/script.h>
+#include <torch/csrc/api/include/torch/utils.h>
+
 using namespace EncCfgParam;
 
 #if JVET_O0756_CALCULATE_HDRMETRICS
 #include "HDRLib/inc/DistortionMetric.H"
 #endif
+
+extern int cnnTime;
 
 struct GOPEntry
 {
@@ -795,10 +800,24 @@ protected:
 public:
   EncCfg()
   {
+    auto startTime  = std::chrono::steady_clock::now();
+    try {
+        // Deserialize the ScriptModule from a file using torch::jit::load().
+        sns32x32 = torch::jit::load("/home/wgq/research/bs/cnn/model/model_epoch600.pt");
+    }
+    catch (const c10::Error& e) {
+        std::cerr << "error loading the model\n";
+    }
+    auto endTime = std::chrono::steady_clock::now();
+    cnnTime += std::chrono::duration_cast<std::chrono::microseconds>( endTime - startTime).count();
   }
 
+  torch::jit::script::Module sns32x32;
+
   virtual ~EncCfg()
-  {}
+  {
+    printf("CNN Time: %12.3f\n", cnnTime/1000000.0);
+  }
 
   void setProfile(Profile::Name profile) { m_profile = profile; }
   void setLevel(Level::Tier tier, Level::Name level) { m_levelTier = tier; m_level = level; }

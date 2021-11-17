@@ -54,7 +54,11 @@
 #include <algorithm>
 
 #include <torch/script.h>
+#include <torch/csrc/api/include/torch/utils.h>
 #include <opencv2/opencv.hpp>
+#include <chrono>
+
+int cnnTime = 0;
 
 //! \ingroup EncoderLib
 //! \{
@@ -676,11 +680,14 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   }
 
   // My code
+  int sns = -1; // -1：uncertain;  0：non-split;   1:split
   if (isLuma(partitioner.chType)
     && partitioner.currArea().lwidth() == 32 && partitioner.currArea().lheight() == 32
     && (partitioner.currArea().lwidth() + partitioner.currArea().lx()) <= tempCS->picture->lwidth()
     && (partitioner.currArea().lheight() + partitioner.currArea().ly()) <= tempCS->picture->lheight())
   {
+    auto startTime  = std::chrono::steady_clock::now();
+
     int w = partitioner.currArea().lwidth();
     int h = partitioner.currArea().lheight();
 
@@ -724,28 +731,28 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     // cout<<"orgL="<<orgL<<endl;
     orgL.convertTo(orgL, CV_32FC1, 0.25f/127.5f, 0);
     preL.convertTo(preL, CV_32FC1, 0.25f/127.5f, 0);
-    cout<<"orgL="<<orgL<<endl;
 
-    torch::jit::script::Module module;
-    try {
-        // Deserialize the ScriptModule from a file using torch::jit::load().
-        module = torch::jit::load("/home/wgq/research/bs/cnn/model/model_epoch600.pt");
-    }
-    catch (const c10::Error& e) {
-        std::cerr << "error loading the model\n";
-    }
+    at::set_num_threads(1);
+
+    torch::jit::script::Module *module;
+    module = &(m_pcEncCfg->sns32x32);
+    // try {
+    //     // Deserialize the ScriptModule from a file using torch::jit::load().
+    //     module = torch::jit::load("/home/wgq/research/bs/cnn/model/model_epoch600.pt");
+    // }
+    // catch (const c10::Error& e) {
+    //     std::cerr << "error loading the model\n";
+    // }
 
     // auto input_tensor = torch::from_blob(frame.data, {1, frame_h, frame_w, kCHANNELS});
     auto orgL_tensor = torch::from_blob(orgL.data, {1, 32, 32, 1}).to(torch::kFloat32);
     auto preL_tensor = torch::from_blob(preL.data, {1, 32, 32, 1}).to(torch::kFloat32);
-    std::cout << orgL_tensor.slice(/*dim=*/2, /*start=*/0, /*end=*/32) << '\n';
     orgL_tensor = orgL_tensor.permute({0, 3, 1, 2});
     preL_tensor = preL_tensor.permute({0, 3, 1, 2});
     orgL_tensor = orgL_tensor - 1;
     preL_tensor = preL_tensor - 1;
 
-    auto qp = torch::ones({1, 1}).to(torch::kFloat32);
-    qp = qp*tempCS->baseQP;
+    auto qp = (torch::ones({1, 1}).to(torch::kFloat32))*tempCS->baseQP;
 
     // torch::Tensor imageBatch = torch::ones({1, 1, 32, 32});
     // torch::Tensor predBatch = torch::ones({1, 1, 32, 32});
@@ -761,9 +768,17 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     torch::NoGradGuard no_grad_guard;
     torch::globalContext().setFlushDenormal(true);
 
-    at::Tensor output = module.forward(input).toTensor();
+    at::Tensor output = module->forward(input).toTensor();
     output = output.softmax(1);
-    std::cout << output.slice(/*dim=*/1, /*start=*/0, /*end=*/2) << '\n';
+    sns = output[0][0].item().toFloat() > 0.5 ? 0 : 1;
+    //cout<<output[0][0].item().toFloat()<<endl;
+    //std::cout << output.slice(/*dim=*/1, /*start=*/0, /*end=*/2) << '\n';
+
+    auto endTime = std::chrono::steady_clock::now();
+    cnnTime += std::chrono::duration_cast<std::chrono::microseconds>( endTime - startTime).count();
+
+    // 1 完成加速代码
+    // 2 修改模型加载方式，只加载一次
   }
 
   do
@@ -863,6 +878,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
     else if( currTestMode.type == ETM_INTRA )
     {
+      if(sns == 1) continue;
       if (slice.getSPS()->getUseColorTrans() && !CS::isDualITree(*tempCS))
       {
         bool skipSecColorSpace = false;
@@ -909,8 +925,9 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     {
       xCheckRDCostIBCModeMerge2Nx2N(tempCS, bestCS, partitioner, currTestMode);
     }
-    else if( isModeSplit( currTestMode ) )
+    else if( isModeSplit( currTestMode ))
     {
+      if(sns == 0) continue;
       if (bestCS->cus.size() != 0)
       {
         splitmode = bestCS->cus[0]->splitSeries;
