@@ -803,7 +803,7 @@ public:
     auto startTime  = std::chrono::steady_clock::now();
     try {
         // Deserialize the ScriptModule from a file using torch::jit::load().
-        sns32x32 = torch::jit::load("/home/wgq/research/bs/cnn/model/model_epoch600.pt");
+        sns32x32 = torch::jit::load("/home/wgq/research/bs/cnn/model/model_epoch2000.pt");
     }
     catch (const c10::Error& e) {
         std::cerr << "error loading the model\n";

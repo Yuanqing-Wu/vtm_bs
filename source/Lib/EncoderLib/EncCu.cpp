@@ -779,8 +779,16 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 
     // 1 完成加速代码
     // 2 修改模型加载方式，只加载一次
+    //printf("------------------------------------\n");
   }
 
+  // int cureuse = -1;
+  // EncTestMode currTestM = m_modeCtrl->currTestMode();
+  // if(partitioner.chType == CHANNEL_TYPE_LUMA)
+  // {
+  //   if(currTestM.type != ETM_INTRA /*&& sns == 0*/)
+  //     cureuse = 1;
+  // }
   do
   {
     for (int i = compBegin; i < (compBegin + numComp); i++)
@@ -791,6 +799,14 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
     EncTestMode currTestMode = m_modeCtrl->currTestMode();
     currTestMode.maxCostAllowed = maxCostAllowed;
+  //   if (isLuma(partitioner.chType)
+  //   && partitioner.currArea().lwidth() == 32 && partitioner.currArea().lheight() == 32
+  //   && (partitioner.currArea().lwidth() + partitioner.currArea().lx()) <= tempCS->picture->lwidth()
+  //   && (partitioner.currArea().lheight() + partitioner.currArea().ly()) <= tempCS->picture->lheight())
+  // {
+  //   printf("%d,%d,%d,%d,%d,%d\n", partitioner.currArea().lx(), partitioner.currArea().ly(),
+  //       partitioner.currArea().lwidth(), partitioner.currArea().lheight(), currTestMode.type, sns);
+  // }
 
     if (pps.getUseDQP() && partitioner.isSepTree(*tempCS) && isChroma( partitioner.chType ))
     {
@@ -927,7 +943,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
     else if( isModeSplit( currTestMode ))
     {
-      if(sns == 0) continue;
+      if(sns == 0 /*&& cureuse!=1*/) continue;
       if (bestCS->cus.size() != 0)
       {
         splitmode = bestCS->cus[0]->splitSeries;
@@ -1007,7 +1023,17 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
   } while( m_modeCtrl->nextMode( *tempCS, partitioner ) );
 
-
+  //   if (isLuma(partitioner.chType)
+  //   && partitioner.currArea().lwidth() == 32 && partitioner.currArea().lheight() == 32
+  //   && (partitioner.currArea().lwidth() + partitioner.currArea().lx()) <= tempCS->picture->lwidth()
+  //   && (partitioner.currArea().lheight() + partitioner.currArea().ly()) <= tempCS->picture->lheight())
+  // {
+  // const ComprCUCtx& cuECtx = m_modeCtrl->getComprCUCtx();
+  // if(cuECtx.extraFeaturesd[9] == bestCS->cost)
+  //   printf("non-split: %d\n", sns);
+  // else
+  //   printf("split: %d\n", sns);
+  // }
   //////////////////////////////////////////////////////////////////////////
   // Finishing CU
 #if ENABLE_SPLIT_PARALLELISM
