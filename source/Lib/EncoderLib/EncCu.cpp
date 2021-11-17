@@ -676,8 +676,10 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
   }
 
+  int w = 16;
+  int h = 16;
   if (isLuma(partitioner.chType) 
-    && partitioner.currArea().lwidth() == 32 && partitioner.currArea().lheight() == 32 
+    && partitioner.currArea().lwidth() == w && partitioner.currArea().lheight() == h 
     && (partitioner.currArea().lwidth() + partitioner.currArea().lx()) <= tempCS->picture->lwidth()
     && (partitioner.currArea().lheight() + partitioner.currArea().ly()) <= tempCS->picture->lheight())
   {
@@ -685,7 +687,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     int h = partitioner.currArea().lheight();
     static int num = 0;
 
-    CodingUnit &planarCU = tempCS->addCU( CS::getArea( *tempCS, tempCS->area, partitioner.chType ), partitioner.chType );
+    CodingUnit &planarCU = tempCS->initCU( CS::getArea( *tempCS, tempCS->area, partitioner.chType ), partitioner.chType );
 
     partitioner.setCUData( planarCU );
 
@@ -693,7 +695,8 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     planarCU.tileIdx          = tempCS->pps->getTileIdx( tempCS->area.lumaPos() );
     planarCU.predMode         = MODE_INTRA;
 
-    CU::addPUs( planarCU );
+    //PredictionUnit &pu = tempCS->initPU( CS::getArea( *tempCS, tempCS->area, partitioner.chType ), partitioner.chType );
+    CU::initPUs(planarCU);
 
     CHECK( !planarCU.firstPU, "CU has no PUs" );
     auto &pu = *planarCU.firstPU;
@@ -755,6 +758,10 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     writeY.close();
 
     num++;
+
+    //tempCS->pus.pop_back();
+    //tempCS->cus.pop_back();
+    tempCS->popCUPU(CS::getArea( *tempCS, tempCS->area, partitioner.chType ));
   }
 
   do
@@ -982,7 +989,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   } while( m_modeCtrl->nextMode( *tempCS, partitioner ) );
 
   if (isLuma(partitioner.chType) 
-    && partitioner.currArea().lwidth() == 32 && partitioner.currArea().lheight() == 32 
+    && partitioner.currArea().lwidth() == w && partitioner.currArea().lheight() == h 
     && (partitioner.currArea().lwidth() + partitioner.currArea().lx()) <= tempCS->picture->lwidth()
     && (partitioner.currArea().lheight() + partitioner.currArea().ly()) <= tempCS->picture->lheight())
   {

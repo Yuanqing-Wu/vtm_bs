@@ -370,6 +370,11 @@ void CU::addPUs( CodingUnit& cu )
   cu.cs->addPU( CS::getArea( *cu.cs, cu, cu.chType ), cu.chType );
 }
 
+void CU::initPUs( CodingUnit& cu )
+{
+  cu.cs->initPU( CS::getArea( *cu.cs, cu, cu.chType ), cu.chType );
+}
+
 void CU::saveMotionInHMVP( const CodingUnit& cu, const bool isToBeDone )
 {
   const PredictionUnit& pu = *cu.firstPU;

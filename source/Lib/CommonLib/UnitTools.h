@@ -72,6 +72,7 @@ namespace CU
 
   uint32_t getNumPUs                      (const CodingUnit& cu);
   void addPUs                         (      CodingUnit& cu);
+  void initPUs( CodingUnit& cu );
 
   void saveMotionInHMVP               (const CodingUnit& cu, const bool isToBeDone );
 
