@@ -682,7 +682,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   cv::Mat preL = cv::Mat(h, w, CV_16UC1);
 
   if (isLuma(partitioner.chType)
-    && (partitioner.currArea().lwidth() != 4 || partitioner.currArea().lheight() != 4)
+    && ((w == 8 && h == 4)||(w == 4 && h == 8))
     && (partitioner.currArea().lwidth() + partitioner.currArea().lx()) <= tempCS->picture->lwidth()
     && (partitioner.currArea().lheight() + partitioner.currArea().ly()) <= tempCS->picture->lheight())
   {
@@ -949,7 +949,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   } while( m_modeCtrl->nextMode( *tempCS, partitioner ) );
 
     if (isLuma(partitioner.chType)
-    && (partitioner.currArea().lwidth() != 4 || partitioner.currArea().lheight() != 4)
+    && ((w == 8 && h == 4)||(w == 4 && h == 8))
     && (partitioner.currArea().lwidth() + partitioner.currArea().lx()) <= tempCS->picture->lwidth()
     && (partitioner.currArea().lheight() + partitioner.currArea().ly()) <= tempCS->picture->lheight())
   {
@@ -1038,7 +1038,6 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       fprintf(m_pcEncCfg->dataFile, "%d,", -1);
 
     fprintf(m_pcEncCfg->dataFile, "%f\n", bestCS->cost);
-
 
   }
 

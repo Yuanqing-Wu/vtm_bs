@@ -954,7 +954,7 @@ public:
     fileName.erase(fileName.end() - 4, fileName.end());
 
     std::string filePath = fileName + ".csv";
-    dataFile = fopen(filePath.c_str(), "a");
+    dataFile = fopen(filePath.c_str(), "w");
   }
   std::string      getOutputFileName()                              { return m_outputFileName; }
   void      setFrameRate                    ( int   i )      { m_iFrameRate = i; }
