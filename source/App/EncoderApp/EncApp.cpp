@@ -243,6 +243,7 @@ void EncApp::xInitLibCfg()
   m_cEncLib.setCabacZeroWordPaddingEnabled                       ( m_cabacZeroWordPaddingEnabled );
 
   m_cEncLib.setOutputFileName                                     ( m_bitstreamFileName );
+  m_cEncLib.openOutputFile                                       ( m_bitstreamFileName );
   m_cEncLib.setFrameRate                                         ( m_iFrameRate );
   m_cEncLib.setFrameSkip                                         ( m_FrameSkip );
   m_cEncLib.setTemporalSubsampleRatio                            ( m_temporalSubsampleRatio );

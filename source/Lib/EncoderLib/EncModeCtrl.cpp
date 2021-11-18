@@ -1161,6 +1161,7 @@ void EncModeCtrlMTnoRQT::initCULevel( Partitioner &partitioner, const CodingStru
   // set features
   ComprCUCtx &cuECtx  = m_ComprCUCtxList.back();
   cuECtx.set( BEST_NON_SPLIT_COST,  MAX_DOUBLE );
+  cuECtx.set( BEST_QT_SPLIT_COST,  MAX_DOUBLE );
   cuECtx.set( BEST_VERT_SPLIT_COST, MAX_DOUBLE );
   cuECtx.set( BEST_HORZ_SPLIT_COST, MAX_DOUBLE );
   cuECtx.set( BEST_TRIH_SPLIT_COST, MAX_DOUBLE );
@@ -1570,7 +1571,7 @@ bool EncModeCtrlMTnoRQT::tryMode( const EncTestMode& encTestmode, const CodingSt
   {
     if (partitioner.currArea().lumaSize().width > 64 || partitioner.currArea().lumaSize().height > 64
         || ((partitioner.currArea().lumaSize().width * partitioner.currArea().lumaSize().height <= 16) && (isLuma(partitioner.chType)) )
-        || ((partitioner.currArea().chromaSize().width * partitioner.currArea().chromaSize().height <= 16) && (!isLuma(partitioner.chType)) && partitioner.isSepTree(cs) ) 
+        || ((partitioner.currArea().chromaSize().width * partitioner.currArea().chromaSize().height <= 16) && (!isLuma(partitioner.chType)) && partitioner.isSepTree(cs) )
       || (partitioner.isLocalSepTree(cs)  && (!isLuma(partitioner.chType)) ) )
     {
       return false;

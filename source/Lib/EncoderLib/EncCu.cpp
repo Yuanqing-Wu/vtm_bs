@@ -681,7 +681,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   cv::Mat orgL = cv::Mat(h, w, CV_16UC1);
   cv::Mat preL = cv::Mat(h, w, CV_16UC1);
 
-  if (isLuma(partitioner.chType) 
+  if (isLuma(partitioner.chType)
     && (partitioner.currArea().lwidth() != 4 || partitioner.currArea().lheight() != 4)
     && (partitioner.currArea().lwidth() + partitioner.currArea().lx()) <= tempCS->picture->lwidth()
     && (partitioner.currArea().lheight() + partitioner.currArea().ly()) <= tempCS->picture->lheight())
@@ -948,7 +948,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
   } while( m_modeCtrl->nextMode( *tempCS, partitioner ) );
 
-    if (isLuma(partitioner.chType) 
+    if (isLuma(partitioner.chType)
     && (partitioner.currArea().lwidth() != 4 || partitioner.currArea().lheight() != 4)
     && (partitioner.currArea().lwidth() + partitioner.currArea().lx()) <= tempCS->picture->lwidth()
     && (partitioner.currArea().lheight() + partitioner.currArea().ly()) <= tempCS->picture->lheight())
@@ -997,48 +997,48 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 
     num++;
 
-    FILE *dataFile = NULL;
+    // FILE *dataFile = NULL;
 
-    filePath = filePath + ".csv";
-    dataFile = fopen(filePath.c_str(), "a");
+    // filePath = filePath + ".csv";
+    // dataFile = fopen(filePath.c_str(), "a");
 
     const ComprCUCtx& cuECtx = m_modeCtrl->getComprCUCtx();
 
-    fprintf(dataFile, "%d,%d,%d,%d,%d,%d,", tempCS->picture->getPOC(), partitioner.currArea().lx(), partitioner.currArea().ly(), 
+    fprintf(m_pcEncCfg->dataFile, "%d,%d,%d,%d,%d,%d,", tempCS->picture->getPOC(), partitioner.currArea().lx(), partitioner.currArea().ly(),
       partitioner.currArea().lwidth(), partitioner.currArea().lheight(), tempCS->baseQP);
 
     if(cuECtx.extraFeaturesd[10]!=MAX_DOUBLE)
-      fprintf(dataFile, "%f,", cuECtx.extraFeaturesd[10]);
+      fprintf(m_pcEncCfg->dataFile, "%f,", cuECtx.extraFeaturesd[10]);
     else
-      fprintf(dataFile, "%d,", -1);
+      fprintf(m_pcEncCfg->dataFile, "%d,", -1);
 
     if(cuECtx.extraFeaturesd[3]!=MAX_DOUBLE)
-      fprintf(dataFile, "%f,", cuECtx.extraFeaturesd[3]);
+      fprintf(m_pcEncCfg->dataFile, "%f,", cuECtx.extraFeaturesd[3]);
     else
-      fprintf(dataFile, "%d,", -1);
+      fprintf(m_pcEncCfg->dataFile, "%d,", -1);
 
     if(cuECtx.extraFeaturesd[4]!=MAX_DOUBLE)
-      fprintf(dataFile, "%f,", cuECtx.extraFeaturesd[4]);
+      fprintf(m_pcEncCfg->dataFile, "%f,", cuECtx.extraFeaturesd[4]);
     else
-      fprintf(dataFile, "%d,", -1);
+      fprintf(m_pcEncCfg->dataFile, "%d,", -1);
 
     if(cuECtx.extraFeaturesd[5]!=MAX_DOUBLE)
-      fprintf(dataFile, "%f,", cuECtx.extraFeaturesd[5]);
+      fprintf(m_pcEncCfg->dataFile, "%f,", cuECtx.extraFeaturesd[5]);
     else
-      fprintf(dataFile, "%d,", -1);
+      fprintf(m_pcEncCfg->dataFile, "%d,", -1);
 
     if(cuECtx.extraFeaturesd[6]!=MAX_DOUBLE)
-      fprintf(dataFile, "%f,", cuECtx.extraFeaturesd[6]);
+      fprintf(m_pcEncCfg->dataFile, "%f,", cuECtx.extraFeaturesd[6]);
     else
-      fprintf(dataFile, "%d,", -1);
+      fprintf(m_pcEncCfg->dataFile, "%d,", -1);
 
     if(cuECtx.extraFeaturesd[7]!=MAX_DOUBLE)
-      fprintf(dataFile, "%f,", cuECtx.extraFeaturesd[7]);
+      fprintf(m_pcEncCfg->dataFile, "%f,", cuECtx.extraFeaturesd[7]);
     else
-      fprintf(dataFile, "%d,", -1);
+      fprintf(m_pcEncCfg->dataFile, "%d,", -1);
 
-    fprintf(dataFile, "%f\n", bestCS->cost);
-    fclose(dataFile);
+    fprintf(m_pcEncCfg->dataFile, "%f\n", bestCS->cost);
+
 
   }
 
@@ -2086,7 +2086,7 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 void EncCu::xCheckPLT(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode)
 {
   if (((partitioner.currArea().lumaSize().width * partitioner.currArea().lumaSize().height <= 16) && (isLuma(partitioner.chType)) )
-        || ((partitioner.currArea().chromaSize().width * partitioner.currArea().chromaSize().height <= 16) && (!isLuma(partitioner.chType)) && partitioner.isSepTree(*tempCS) ) 
+        || ((partitioner.currArea().chromaSize().width * partitioner.currArea().chromaSize().height <= 16) && (!isLuma(partitioner.chType)) && partitioner.isSepTree(*tempCS) )
       || (partitioner.isLocalSepTree(*tempCS)  && (!isLuma(partitioner.chType))  )  )
   {
     return;

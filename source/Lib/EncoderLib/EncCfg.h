@@ -795,11 +795,14 @@ protected:
 
 public:
   EncCfg()
-  {
-  }
+  { }
 
   virtual ~EncCfg()
-  {}
+  {
+    fclose(dataFile);
+  }
+
+  FILE *dataFile = NULL;
 
   void setProfile(Profile::Name profile) { m_profile = profile; }
   void setLevel(Level::Tier tier, Level::Name level) { m_levelTier = tier; m_level = level; }
@@ -947,6 +950,12 @@ public:
   void      setNoApsConstraintFlag(bool val) { m_noApsConstraintFlag = val; }
 
   void      setOutputFileName               ( std::string fileName) { m_outputFileName = fileName; }
+  void      openOutputFile                  ( std::string fileName) {
+    fileName.erase(fileName.end() - 4, fileName.end());
+
+    std::string filePath = fileName + ".csv";
+    dataFile = fopen(filePath.c_str(), "a");
+  }
   std::string      getOutputFileName()                              { return m_outputFileName; }
   void      setFrameRate                    ( int   i )      { m_iFrameRate = i; }
   void      setFrameSkip                    ( uint32_t  i )      { m_FrameSkip = i; }
