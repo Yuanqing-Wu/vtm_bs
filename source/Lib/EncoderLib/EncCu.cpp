@@ -676,8 +676,8 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
   }
 
-  int w = 16;
-  int h = 16;
+  int w = 8;
+  int h = 8;
   if (isLuma(partitioner.chType) 
     && partitioner.currArea().lwidth() == w && partitioner.currArea().lheight() == h 
     && (partitioner.currArea().lwidth() + partitioner.currArea().lx()) <= tempCS->picture->lwidth()
