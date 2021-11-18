@@ -676,16 +676,16 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
   }
 
-  int w = 8;
-  int h = 8;
+  int w = partitioner.currArea().lwidth();
+  int h = partitioner.currArea().lheight();
+  cv::Mat orgL = cv::Mat(h, w, CV_16UC1);
+  cv::Mat preL = cv::Mat(h, w, CV_16UC1);
+
   if (isLuma(partitioner.chType) 
-    && partitioner.currArea().lwidth() == w && partitioner.currArea().lheight() == h 
+    && (partitioner.currArea().lwidth() != 4 || partitioner.currArea().lheight() != 4)
     && (partitioner.currArea().lwidth() + partitioner.currArea().lx()) <= tempCS->picture->lwidth()
     && (partitioner.currArea().lheight() + partitioner.currArea().ly()) <= tempCS->picture->lheight())
   {
-    int w = partitioner.currArea().lwidth();
-    int h = partitioner.currArea().lheight();
-    static int num = 0;
 
     CodingUnit &planarCU = tempCS->initCU( CS::getArea( *tempCS, tempCS->area, partitioner.chType ), partitioner.chType );
 
@@ -714,8 +714,6 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     m_pcIntraSearch->xPredIntraPlanar(srcBuf, piPred);
 
     CPelBuf orgLuma = tempCS->picture->getTrueOrigBuf(partitioner.currArea().blocks[COMPONENT_Y]);
-    cv::Mat orgL = cv::Mat(h, w, CV_16UC1);
-    cv::Mat preL = cv::Mat(h, w, CV_16UC1);
 
     for( int i = 0; i < h; ++i )
     {
@@ -723,44 +721,6 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       memcpy(preL.data + sizeof(short) * w  * i, piPred.buf + piPred.stride * i , sizeof(short) * w);
     }
 
-    // orgL.convertTo(orgL, CV_8UC1, 0.25, 0);
-    // preL.convertTo(preL, CV_8UC1, 0.25, 0);
-
-    std::string filePath = m_pcEncCfg->getOutputFileName();
-    filePath.erase(filePath.end() - 4, filePath.end());
-    if (access(filePath.c_str(), 0) == -1){
-      std::string cmd = "mkdir " + filePath;
-      if(system(cmd.c_str()) == -1) throw "Craet file folder fail!";
-    }
-
-    char orgNum[20];
-    char preNum[20];
-    snprintf ( orgNum, 20, "/%08dorg.yuv", num);
-    snprintf ( preNum, 20, "/%08dpre.yuv", num);
-    std::string orgfilePath = filePath + orgNum;
-    std::string prefilePath = filePath + preNum;
-
-    std::vector<int> compression_params;
-    compression_params.push_back(cv::IMWRITE_PNG_COMPRESSION);
-    compression_params.push_back(9);
-
-    cv::Mat image;
-    std::fstream writeY;
-
-    orgL.convertTo(image, CV_8UC1, 0.25, 0);
-    writeY.open(orgfilePath, std::ios::out | std::ios::binary);
-    writeY.write(reinterpret_cast<char*>(image.data), w*h);
-    writeY.close();
-
-    preL.convertTo(image, CV_8UC1, 0.25, 0);
-    writeY.open(prefilePath, std::ios::out | std::ios::binary);
-    writeY.write(reinterpret_cast<char*>(image.data), w*h);
-    writeY.close();
-
-    num++;
-
-    //tempCS->pus.pop_back();
-    //tempCS->cus.pop_back();
     tempCS->popCUPU(CS::getArea( *tempCS, tempCS->area, partitioner.chType ));
   }
 
@@ -988,14 +948,56 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
   } while( m_modeCtrl->nextMode( *tempCS, partitioner ) );
 
-  if (isLuma(partitioner.chType) 
-    && partitioner.currArea().lwidth() == w && partitioner.currArea().lheight() == h 
+    if (isLuma(partitioner.chType) 
+    && (partitioner.currArea().lwidth() != 4 || partitioner.currArea().lheight() != 4)
     && (partitioner.currArea().lwidth() + partitioner.currArea().lx()) <= tempCS->picture->lwidth()
     && (partitioner.currArea().lheight() + partitioner.currArea().ly()) <= tempCS->picture->lheight())
   {
-    FILE *dataFile = NULL;
+    static int num = 0;
+
+    if(h>w)
+    {
+      orgL = orgL.t();
+      preL = preL.t();
+    }
+
+    // orgL.convertTo(orgL, CV_8UC1, 0.25, 0);
+    // preL.convertTo(preL, CV_8UC1, 0.25, 0);
+
     std::string filePath = m_pcEncCfg->getOutputFileName();
     filePath.erase(filePath.end() - 4, filePath.end());
+    if (access(filePath.c_str(), 0) == -1){
+      std::string cmd = "mkdir " + filePath;
+      if(system(cmd.c_str()) == -1) throw "Craet file folder fail!";
+    }
+
+    char orgNum[20];
+    char preNum[20];
+    snprintf ( orgNum, 20, "/%08dorg.yuv", num);
+    snprintf ( preNum, 20, "/%08dpre.yuv", num);
+    std::string orgfilePath = filePath + orgNum;
+    std::string prefilePath = filePath + preNum;
+
+    std::vector<int> compression_params;
+    compression_params.push_back(cv::IMWRITE_PNG_COMPRESSION);
+    compression_params.push_back(9);
+
+    cv::Mat image;
+    std::fstream writeY;
+
+    orgL.convertTo(image, CV_8UC1, 0.25, 0);
+    writeY.open(orgfilePath, std::ios::out | std::ios::binary);
+    writeY.write(reinterpret_cast<char*>(image.data), w*h);
+    writeY.close();
+
+    preL.convertTo(image, CV_8UC1, 0.25, 0);
+    writeY.open(prefilePath, std::ios::out | std::ios::binary);
+    writeY.write(reinterpret_cast<char*>(image.data), w*h);
+    writeY.close();
+
+    num++;
+
+    FILE *dataFile = NULL;
 
     filePath = filePath + ".csv";
     dataFile = fopen(filePath.c_str(), "a");
@@ -1037,7 +1039,10 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 
     fprintf(dataFile, "%f\n", bestCS->cost);
     fclose(dataFile);
+
   }
+
+
 
   //////////////////////////////////////////////////////////////////////////
   // Finishing CU
