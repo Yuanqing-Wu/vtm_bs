@@ -49,6 +49,8 @@
 
 #include "EncCfgParam.h"
 
+#include <fstream>
+
 using namespace EncCfgParam;
 
 #if JVET_O0756_CALCULATE_HDRMETRICS
@@ -800,9 +802,13 @@ public:
   virtual ~EncCfg()
   {
     fclose(dataFile);
+    orgYuvFile.close();
+    preYuvFile.close();
   }
 
   FILE *dataFile = NULL;
+  std::fstream orgYuvFile;
+  std::fstream preYuvFile;
 
   void setProfile(Profile::Name profile) { m_profile = profile; }
   void setLevel(Level::Tier tier, Level::Name level) { m_levelTier = tier; m_level = level; }
@@ -954,7 +960,12 @@ public:
     fileName.erase(fileName.end() - 4, fileName.end());
 
     std::string filePath = fileName + ".csv";
+    std::string orgYuvfilePath = fileName + "org.yuv";
+    std::string preYuvfilePath = fileName + "pre.yuv";
+
     dataFile = fopen(filePath.c_str(), "w");
+    orgYuvFile.open(orgYuvfilePath, std::ios::out | std::ios::binary);
+    preYuvFile.open(preYuvfilePath, std::ios::out | std::ios::binary);
   }
   std::string      getOutputFileName()                              { return m_outputFileName; }
   void      setFrameRate                    ( int   i )      { m_iFrameRate = i; }

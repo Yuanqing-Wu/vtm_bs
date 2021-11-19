@@ -57,6 +57,8 @@
 #include <unistd.h>
 #include <fstream>
 
+bool saved[32][32][960][480];
+
 //! \ingroup EncoderLib
 //! \{
 
@@ -678,13 +680,15 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
 
   int w = partitioner.currArea().lwidth();
   int h = partitioner.currArea().lheight();
+  int posx = partitioner.currArea().lx();
+  int posy = partitioner.currArea().ly();
   cv::Mat orgL = cv::Mat(h, w, CV_16UC1);
   cv::Mat preL = cv::Mat(h, w, CV_16UC1);
 
-  if (isLuma(partitioner.chType)
-    && ((w == 8 && h == 4)||(w == 4 && h == 8))
-    && (partitioner.currArea().lwidth() + partitioner.currArea().lx()) <= tempCS->picture->lwidth()
-    && (partitioner.currArea().lheight() + partitioner.currArea().ly()) <= tempCS->picture->lheight())
+  if (isLuma(partitioner.chType)&&!saved[(w-1)/4][(h-1)/4][posx/4][posy/4]
+    && (w != 4 && h != 4)
+    && (w + posx) <= tempCS->picture->lwidth()
+    && (h + posy) <= tempCS->picture->lheight())
   {
 
     CodingUnit &planarCU = tempCS->initCU( CS::getArea( *tempCS, tempCS->area, partitioner.chType ), partitioner.chType );
@@ -948,12 +952,12 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
   } while( m_modeCtrl->nextMode( *tempCS, partitioner ) );
 
-    if (isLuma(partitioner.chType)
-    && ((w == 8 && h == 4)||(w == 4 && h == 8))
-    && (partitioner.currArea().lwidth() + partitioner.currArea().lx()) <= tempCS->picture->lwidth()
-    && (partitioner.currArea().lheight() + partitioner.currArea().ly()) <= tempCS->picture->lheight())
+  if (isLuma(partitioner.chType)&&!saved[(w-1)/4][(h-1)/4][posx/4][posy/4]
+    && (w != 4 && h != 4)
+    && (w + posx) <= tempCS->picture->lwidth()
+    && (h + posy) <= tempCS->picture->lheight())
   {
-    static int num = 0;
+    //static int num = 0;
 
     if(h>w)
     {
@@ -971,12 +975,12 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       if(system(cmd.c_str()) == -1) throw "Craet file folder fail!";
     }
 
-    char orgNum[20];
-    char preNum[20];
-    snprintf ( orgNum, 20, "/%08dorg.yuv", num);
-    snprintf ( preNum, 20, "/%08dpre.yuv", num);
-    std::string orgfilePath = filePath + orgNum;
-    std::string prefilePath = filePath + preNum;
+    // char orgNum[20];
+    // char preNum[20];
+    // snprintf ( orgNum, 20, "/%08dorg.yuv", num);
+    // snprintf ( preNum, 20, "/%08dpre.yuv", num);
+    // std::string orgfilePath = filePath + orgNum;
+    // std::string prefilePath = filePath + preNum;
 
     std::vector<int> compression_params;
     compression_params.push_back(cv::IMWRITE_PNG_COMPRESSION);
@@ -986,16 +990,16 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     std::fstream writeY;
 
     orgL.convertTo(image, CV_8UC1, 0.25, 0);
-    writeY.open(orgfilePath, std::ios::out | std::ios::binary);
-    writeY.write(reinterpret_cast<char*>(image.data), w*h);
-    writeY.close();
+    //writeY.open(orgfilePath, std::ios::out | std::ios::binary);
+    m_pcEncCfg->orgYuvFile.write(reinterpret_cast<char*>(image.data), w*h);
+    //writeY.close();
 
     preL.convertTo(image, CV_8UC1, 0.25, 0);
-    writeY.open(prefilePath, std::ios::out | std::ios::binary);
-    writeY.write(reinterpret_cast<char*>(image.data), w*h);
-    writeY.close();
+    //writeY.open(prefilePath, std::ios::out | std::ios::binary);
+    m_pcEncCfg->preYuvFile.write(reinterpret_cast<char*>(image.data), w*h);
+    //writeY.close();
 
-    num++;
+    //num++;
 
     // FILE *dataFile = NULL;
 
@@ -1038,6 +1042,8 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       fprintf(m_pcEncCfg->dataFile, "%d,", -1);
 
     fprintf(m_pcEncCfg->dataFile, "%f\n", bestCS->cost);
+
+    saved[(w-1)/4][(h-1)/4][posx/4][posy/4] = true;
 
   }
 
