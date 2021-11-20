@@ -680,106 +680,131 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   }
 
   // My code
-  int sns = -1; // -1：uncertain;  0：non-split;   1:split
+  int w = partitioner.currArea().lwidth();
+  int h = partitioner.currArea().lheight();
+  int posx = partitioner.currArea().lx();
+  int posy = partitioner.currArea().ly();
+
+  int sns = -1;  // -1：uncertain;  0：non-split;   1:split;
+  int hsvs = -1; // -1：uncertain;  0：hs;          1:vs;
   if (isLuma(partitioner.chType)
-    && partitioner.currArea().lwidth() == 32 && partitioner.currArea().lheight() == 32
-    && (partitioner.currArea().lwidth() + partitioner.currArea().lx()) <= tempCS->picture->lwidth()
-    && (partitioner.currArea().lheight() + partitioner.currArea().ly()) <= tempCS->picture->lheight())
+  && w == 8 && h == 16
+  && (w + posx) <= tempCS->picture->lwidth()
+  && (h + posy) <= tempCS->picture->lheight())
   {
     auto startTime  = std::chrono::steady_clock::now();
 
-    int w = partitioner.currArea().lwidth();
-    int h = partitioner.currArea().lheight();
+    // Check possible partition modes
+    bool canNo, canQt, canBh, canTh, canBv, canTv;
+    partitioner.canSplit(*tempCS, canNo, canQt, canBh, canBv, canTh, canTv);
+    if(!canQt && !canBh && !canBv && !canTh && !canTv) sns = 0;
+    else if(!canNo) sns = 1;
 
-    CodingUnit &planarCU = tempCS->addCU( CS::getArea( *tempCS, tempCS->area, partitioner.chType ), partitioner.chType );
+    if((!canBh && !canTh) && (canBv || canTv)) hsvs = 1;
+    if((!canBv && !canTv) && (canBh || canTh)) hsvs = 0;
 
-    partitioner.setCUData( planarCU );
+    // Algoritm
+    if(sns != 0 && !(sns == 1 && hsvs != -1)){
 
-    planarCU.slice            = tempCS->slice;
-    planarCU.tileIdx          = tempCS->pps->getTileIdx( tempCS->area.lumaPos() );
-    planarCU.predMode         = MODE_INTRA;
+      // Get origin buffer and planar prediction buffer
+      CodingUnit &planarCU = tempCS->initCU( CS::getArea( *tempCS, tempCS->area, partitioner.chType ), partitioner.chType );
 
-    CU::addPUs( planarCU );
+      partitioner.setCUData( planarCU );
 
-    CHECK( !planarCU.firstPU, "CU has no PUs" );
-    auto &pu = *planarCU.firstPU;
-    CHECK(pu.cu != &planarCU, "PU is not contained in the CU");
-    CHECK(!pu.Y().valid(), "PU is not valid");
+      planarCU.slice            = tempCS->slice;
+      planarCU.tileIdx          = tempCS->pps->getTileIdx( tempCS->area.lumaPos() );
+      planarCU.predMode         = MODE_INTRA;
 
-    pu.multiRefIdx            = 0;
-    m_pcIntraSearch->initIntraPatternChType(planarCU, pu.Y(), true);
+      CU::initPUs( planarCU );
 
-    const int srcStride  = m_pcIntraSearch->m_refBufferStride[COMPONENT_Y];
-    const int srcHStride = 2;
+      CHECK( !planarCU.firstPU, "CU has no PUs" );
+      auto &pu = *planarCU.firstPU;
+      CHECK(pu.cu != &planarCU, "PU is not contained in the CU");
+      CHECK(!pu.Y().valid(), "PU is not valid");
 
-    const CPelBuf & srcBuf = CPelBuf(m_pcIntraSearch->getPredictorPtr(COMPONENT_Y), srcStride, srcHStride);
-    PelBuf piPred = tempCS->getPredBuf(pu.Y());
-    m_pcIntraSearch->xPredIntraPlanar(srcBuf, piPred);
+      pu.multiRefIdx            = 0;
+      m_pcIntraSearch->initIntraPatternChType(planarCU, pu.Y(), true);
 
-    CPelBuf orgLuma = tempCS->picture->getTrueOrigBuf(partitioner.currArea().blocks[COMPONENT_Y]);
-    cv::Mat orgL = cv::Mat(h, w, CV_16UC1);
-    cv::Mat preL = cv::Mat(h, w, CV_16UC1);
+      const int srcStride  = m_pcIntraSearch->m_refBufferStride[COMPONENT_Y];
+      const int srcHStride = 2;
 
-    for( int i = 0; i < h; ++i )
-    {
+      const CPelBuf & srcBuf = CPelBuf(m_pcIntraSearch->getPredictorPtr(COMPONENT_Y), srcStride, srcHStride);
+      PelBuf piPred = tempCS->getPredBuf(pu.Y());
+      m_pcIntraSearch->xPredIntraPlanar(srcBuf, piPred);
+
+      CPelBuf orgLuma = tempCS->picture->getTrueOrigBuf(partitioner.currArea().blocks[COMPONENT_Y]);
+      cv::Mat orgL = cv::Mat(h, w, CV_16UC1);
+      cv::Mat preL = cv::Mat(h, w, CV_16UC1);
+
+      for( int i = 0; i < h; ++i )
+      {
       memcpy(orgL.data + sizeof(short) * w  * i, orgLuma.buf + orgLuma.stride * i , sizeof(short) * w);
       memcpy(preL.data + sizeof(short) * w  * i, piPred.buf + piPred.stride * i , sizeof(short) * w);
+      }
+
+      orgL.convertTo(orgL, CV_32FC1, 0.25f/127.5f, 0);
+      preL.convertTo(preL, CV_32FC1, 0.25f/127.5f, 0);
+
+      // load torch model and predict
+      at::set_num_threads(1);
+
+      torch::jit::script::Module *module;
+      if(w == 64 && h ==64) module = &(m_pcEncCfg->intra64x64);
+      else if(w == 32 && h == 32) module = &(m_pcEncCfg->intra32x32);
+      else if(w == 16 && h == 16) module = &(m_pcEncCfg->intra16x16);
+      else if(w == 8  && h == 8)  module = &(m_pcEncCfg->intra8x8);
+      else if((w == 32 && h == 16) || (w == 16 && h == 32)) module = &(m_pcEncCfg->intra32x16);
+      else if((w == 32 && h == 8)  || (w == 8 && h == 32))  module = &(m_pcEncCfg->intra32x8);
+      else if((w == 16 && h == 8)  || (w == 8 && h == 16))  module = &(m_pcEncCfg->intra16x8);
+
+      // auto input_tensor = torch::from_blob(frame.data, {1, frame_h, frame_w, kCHANNELS});
+      auto orgL_tensor = torch::from_blob(orgL.data, {1, w, h, 1}).to(torch::kFloat32);
+      auto preL_tensor = torch::from_blob(preL.data, {1, w, h, 1}).to(torch::kFloat32);
+      if(w >= h)
+      {
+        orgL_tensor = orgL_tensor.permute({0, 3, 1, 2});
+        preL_tensor = preL_tensor.permute({0, 3, 1, 2});
+      }
+      else
+      {
+        orgL_tensor = orgL_tensor.permute({0, 3, 2, 1});
+        preL_tensor = preL_tensor.permute({0, 3, 2, 1});
+      }
+      orgL_tensor = orgL_tensor - 1;
+      preL_tensor = preL_tensor - 1;
+
+      auto qp = (torch::ones({1, 1}).to(torch::kFloat32))*tempCS->baseQP;
+
+      // torch::Tensor imageBatch = torch::ones({1, 1, 32, 32});
+      // torch::Tensor predBatch = torch::ones({1, 1, 32, 32});
+      // torch::Tensor qp = torch::ones({1});
+
+      //std::cout << orgL_tensor.slice(/*dim=*/2, /*start=*/0, /*end=*/32) << '\n';
+
+      std::vector<torch::jit::IValue> input;
+      input.push_back(orgL_tensor);
+      input.push_back(preL_tensor);
+      input.push_back(qp);
+
+      torch::NoGradGuard no_grad_guard;
+      torch::globalContext().setFlushDenormal(true);
+
+      auto output = module->forward(input).toTuple();
+      at::Tensor snsOutput = output->elements()[0].toTensor();
+      at::Tensor hsvsOutput = output->elements()[1].toTensor();
+      snsOutput = snsOutput.softmax(1);
+      hsvsOutput = hsvsOutput.softmax(1);
+      sns = snsOutput[0][0].item().toFloat() > 0.5 ? 0 : 1;
+      hsvs = hsvsOutput[0][0].item().toFloat() > 0.5 ? 0 : 1;
+
+      //cout<<output[0][0].item().toFloat()<<endl;
+      std::cout <<snsOutput.slice(/*dim=*/1, /*start=*/0, /*end=*/2) << '\n';
+      std::cout <<hsvsOutput.slice(/*dim=*/1, /*start=*/0, /*end=*/2) << '\n';
+      tempCS->popCUPU(CS::getArea( *tempCS, tempCS->area, partitioner.chType ));
+
+      auto endTime = std::chrono::steady_clock::now();
+      cnnTime += std::chrono::duration_cast<std::chrono::microseconds>( endTime - startTime).count();
     }
-    // cout<<"orgL="<<orgL<<endl;
-    // orgL.convertTo(orgL, CV_8UC1, 0.25, 0);
-    // preL.convertTo(preL, CV_8UC1, 0.25, 0);
-    // cout<<"orgL="<<orgL<<endl;
-    orgL.convertTo(orgL, CV_32FC1, 0.25f/127.5f, 0);
-    preL.convertTo(preL, CV_32FC1, 0.25f/127.5f, 0);
-
-    at::set_num_threads(1);
-
-    torch::jit::script::Module *module;
-    module = &(m_pcEncCfg->sns32x32);
-    // try {
-    //     // Deserialize the ScriptModule from a file using torch::jit::load().
-    //     module = torch::jit::load("/home/wgq/research/bs/cnn/model/model_epoch600.pt");
-    // }
-    // catch (const c10::Error& e) {
-    //     std::cerr << "error loading the model\n";
-    // }
-
-    // auto input_tensor = torch::from_blob(frame.data, {1, frame_h, frame_w, kCHANNELS});
-    auto orgL_tensor = torch::from_blob(orgL.data, {1, 32, 32, 1}).to(torch::kFloat32);
-    auto preL_tensor = torch::from_blob(preL.data, {1, 32, 32, 1}).to(torch::kFloat32);
-    orgL_tensor = orgL_tensor.permute({0, 3, 1, 2});
-    preL_tensor = preL_tensor.permute({0, 3, 1, 2});
-    orgL_tensor = orgL_tensor - 1;
-    preL_tensor = preL_tensor - 1;
-
-    auto qp = (torch::ones({1, 1}).to(torch::kFloat32))*tempCS->baseQP;
-
-    // torch::Tensor imageBatch = torch::ones({1, 1, 32, 32});
-    // torch::Tensor predBatch = torch::ones({1, 1, 32, 32});
-    // torch::Tensor qp = torch::ones({1});
-
-    //std::cout << orgL_tensor.slice(/*dim=*/2, /*start=*/0, /*end=*/32) << '\n';
-
-    std::vector<torch::jit::IValue> input;
-    input.push_back(orgL_tensor);
-    input.push_back(preL_tensor);
-    input.push_back(qp);
-
-    torch::NoGradGuard no_grad_guard;
-    torch::globalContext().setFlushDenormal(true);
-
-    at::Tensor output = module->forward(input).toTensor();
-    output = output.softmax(1);
-    sns = output[0][0].item().toFloat() > 0.5 ? 0 : 1;
-    //cout<<output[0][0].item().toFloat()<<endl;
-    //std::cout << output.slice(/*dim=*/1, /*start=*/0, /*end=*/2) << '\n';
-
-    auto endTime = std::chrono::steady_clock::now();
-    cnnTime += std::chrono::duration_cast<std::chrono::microseconds>( endTime - startTime).count();
-
-    // 1 完成加速代码
-    // 2 修改模型加载方式，只加载一次
-    //printf("------------------------------------\n");
   }
 
   // int cureuse = -1;

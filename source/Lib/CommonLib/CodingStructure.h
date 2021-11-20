@@ -141,7 +141,10 @@ public:
   const TransformUnit  *getTURestricted(const Position &pos, const TransformUnit& curTu,                            const ChannelType _chType) const;
 
   CodingUnit&     addCU(const UnitArea &unit, const ChannelType _chType);
+  CodingUnit&     initCU( const UnitArea &unit, const ChannelType chType );
   PredictionUnit& addPU(const UnitArea &unit, const ChannelType _chType);
+  PredictionUnit& initPU( const UnitArea &unit, const ChannelType chType );
+  void popCUPU(const UnitArea &unit);
   TransformUnit&  addTU(const UnitArea &unit, const ChannelType _chType);
   void            addEmptyTUs(Partitioner &partitioner);
 

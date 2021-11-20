@@ -583,6 +583,142 @@ CodingUnit& CodingStructure::addCU( const UnitArea &unit, const ChannelType chTy
   return *cu;
 }
 
+CodingUnit& CodingStructure::initCU( const UnitArea &unit, const ChannelType chType )
+{
+  CodingUnit *cu = m_cuCache.get();
+
+  cu->UnitArea::operator=( unit );
+  cu->initData();
+  cu->cs        = this;
+  cu->slice     = nullptr;
+  cu->next      = nullptr;
+  cu->firstPU   = nullptr;
+  cu->lastPU    = nullptr;
+  cu->firstTU   = nullptr;
+  cu->lastTU    = nullptr;
+  cu->chType    = chType;
+  cu->treeType = treeType;
+  cu->modeType = modeType;
+
+  cus.push_back( cu );
+  uint32_t idx = m_numCUs + 1;
+  cu->idx  = idx;
+
+  uint32_t numCh = ::getNumberValidChannels( area.chromaFormat );
+
+  for( uint32_t i = 0; i < numCh; i++ )
+  {
+    if( !cu->blocks[i].valid() )
+    {
+      continue;
+    }
+
+    const CompArea &_selfBlk = area.blocks[i];
+    const CompArea     &_blk = cu-> blocks[i];
+
+    const UnitScale& scale = unitScale[_blk.compID];
+    const Area scaledSelf  = scale.scale( _selfBlk );
+    const Area scaledBlk   = scale.scale(     _blk );
+    unsigned *idxPtr       = m_cuIdx[i] + rsAddr( scaledBlk.pos(), scaledSelf.pos(), scaledSelf.width );
+    CHECK( *idxPtr, "Overwriting a pre-existing value, should be '0'!" );
+    AreaBuf<uint32_t>( idxPtr, scaledSelf.width, scaledBlk.size() ).fill( idx );
+  }
+
+  return *cu;
+}
+
+void CodingStructure::popCUPU( const UnitArea &unit)
+{
+  uint32_t numCh = ::getNumberValidChannels( area.chromaFormat );
+
+
+  for( uint32_t i = 0; i < numCh; i++ )
+  {
+    if( !unit.blocks[i].valid() )
+    {
+      continue;
+    }
+    const CompArea &_selfBlk = area.blocks[i];
+    const CompArea     &_blk = unit.blocks[i];
+
+    const UnitScale& scale = unitScale[_blk.compID];
+    const Area scaledSelf  = scale.scale( _selfBlk );
+    const Area scaledBlk   = scale.scale(     _blk );
+    unsigned *idxPtrCU       = m_cuIdx[i] + rsAddr( scaledBlk.pos(), scaledSelf.pos(), scaledSelf.width );
+    AreaBuf<uint32_t>( idxPtrCU, scaledSelf.width, scaledBlk.size() ).fill( 0 );
+
+    unsigned *idxPtrPU       = m_puIdx[i] + rsAddr( scaledBlk.pos(), scaledSelf.pos(), scaledSelf.width );
+    AreaBuf<uint32_t>( idxPtrPU, scaledSelf.width, scaledBlk.size() ).fill( 0 );
+  }
+
+  m_puCache.cache( pus.back() );
+  pus.pop_back();
+
+  m_cuCache.cache( cus.back() );
+  cus.pop_back();
+}
+
+PredictionUnit& CodingStructure::initPU( const UnitArea &unit, const ChannelType chType )
+{
+  PredictionUnit *pu = m_puCache.get();
+
+  pu->UnitArea::operator=( unit );
+  pu->initData();
+  pu->next   = nullptr;
+  pu->cs     = this;
+  pu->cu     = m_isTuEnc ? cus[0] : getCU( unit.blocks[chType].pos(), chType );
+  pu->chType = chType;
+#if ENABLE_SPLIT_PARALLELISM
+
+  CHECK( pu->cacheId != pu->cu->cacheId, "Inconsintent cacheId between the PU and assigned CU" );
+  CHECK( pu->cu->firstPU != nullptr, "Without an RQT the firstPU should be null" );
+#endif
+
+//   PredictionUnit *prevPU = m_numPUs > 0 ? pus.back() : nullptr;
+
+//   if( prevPU && prevPU->cu == pu->cu )
+//   {
+//     prevPU->next = pu;
+// #if ENABLE_SPLIT_PARALLELISM
+
+//     CHECK( prevPU->cacheId != pu->cacheId, "Inconsintent cacheId between previous and current PU" );
+// #endif
+//   }
+
+  pus.push_back( pu );
+
+  if( pu->cu->firstPU == nullptr )
+  {
+    pu->cu->firstPU = pu;
+  }
+  pu->cu->lastPU = pu;
+
+  uint32_t idx = m_numPUs + 1;
+  pu->idx  = idx;
+
+  uint32_t numCh = ::getNumberValidChannels( area.chromaFormat );
+  for( uint32_t i = 0; i < numCh; i++ )
+  {
+    if( !pu->blocks[i].valid() )
+    {
+      continue;
+    }
+
+    const CompArea &_selfBlk = area.blocks[i];
+    const CompArea     &_blk = pu-> blocks[i];
+
+    const UnitScale& scale = unitScale[_blk.compID];
+    const Area scaledSelf  = scale.scale( _selfBlk );
+    const Area scaledBlk   = scale.scale(     _blk );
+    unsigned *idxPtr       = m_puIdx[i] + rsAddr( scaledBlk.pos(), scaledSelf.pos(), scaledSelf.width );
+    CHECK( *idxPtr, "Overwriting a pre-existing value, should be '0'!" );
+    AreaBuf<uint32_t>( idxPtr, scaledSelf.width, scaledBlk.size() ).fill( idx );
+  }
+
+  return *pu;
+}
+
+
 PredictionUnit& CodingStructure::addPU( const UnitArea &unit, const ChannelType chType )
 {
   PredictionUnit *pu = m_puCache.get();

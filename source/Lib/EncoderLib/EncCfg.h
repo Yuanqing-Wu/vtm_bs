@@ -801,18 +801,25 @@ public:
   EncCfg()
   {
     auto startTime  = std::chrono::steady_clock::now();
-    try {
-        // Deserialize the ScriptModule from a file using torch::jit::load().
-        sns32x32 = torch::jit::load("/home/wgq/research/bs/cnn/model/model_epoch2000.pt");
-    }
-    catch (const c10::Error& e) {
-        std::cerr << "error loading the model\n";
-    }
+    intra64x64 = torch::jit::load("/home/wgq/research/bs/cnn/model/16x8/model_epoch50.pt");
+    intra32x32 = torch::jit::load("/home/wgq/research/bs/cnn/model/16x8/model_epoch50.pt");
+    intra16x16 = torch::jit::load("/home/wgq/research/bs/cnn/model/16x8/model_epoch50.pt");
+    intra8x8   = torch::jit::load("/home/wgq/research/bs/cnn/model/16x8/model_epoch50.pt");
+    intra32x16 = torch::jit::load("/home/wgq/research/bs/cnn/model/16x8/model_epoch50.pt");
+    intra32x8  = torch::jit::load("/home/wgq/research/bs/cnn/model/16x8/model_epoch50.pt");
+    intra16x8  = torch::jit::load("/home/wgq/research/bs/cnn/model/16x8/model_epoch50.pt");
+
     auto endTime = std::chrono::steady_clock::now();
     cnnTime += std::chrono::duration_cast<std::chrono::microseconds>( endTime - startTime).count();
   }
 
-  torch::jit::script::Module sns32x32;
+  torch::jit::script::Module intra64x64;
+  torch::jit::script::Module intra32x32;
+  torch::jit::script::Module intra16x16;
+  torch::jit::script::Module intra8x8;
+  torch::jit::script::Module intra32x16;
+  torch::jit::script::Module intra32x8;
+  torch::jit::script::Module intra16x8;
 
   virtual ~EncCfg()
   {
