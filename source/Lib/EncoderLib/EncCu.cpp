@@ -959,12 +959,6 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   {
     //static int num = 0;
 
-    if(h>w)
-    {
-      orgL = orgL.t();
-      preL = preL.t();
-    }
-
     // orgL.convertTo(orgL, CV_8UC1, 0.25, 0);
     // preL.convertTo(preL, CV_8UC1, 0.25, 0);
 
