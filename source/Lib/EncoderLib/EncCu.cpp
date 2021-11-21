@@ -688,7 +688,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   int sns = -1;  // -1：uncertain;  0：non-split;   1:split;
   int hsvs = -1; // -1：uncertain;  0：hs;          1:vs;
   if (isLuma(partitioner.chType)
-  && w == 8 && h == 16
+  && w < 128 && w != 4 && h != 4
   && (w + posx) <= tempCS->picture->lwidth()
   && (h + posy) <= tempCS->picture->lheight())
   {
@@ -748,7 +748,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       // load torch model and predict
       at::set_num_threads(1);
 
-      torch::jit::script::Module *module;
+      torch::jit::script::Module *module = nullptr;
       if(w == 64 && h ==64) module = &(m_pcEncCfg->intra64x64);
       else if(w == 32 && h == 32) module = &(m_pcEncCfg->intra32x32);
       else if(w == 16 && h == 16) module = &(m_pcEncCfg->intra16x16);
@@ -795,11 +795,12 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       snsOutput = snsOutput.softmax(1);
       hsvsOutput = hsvsOutput.softmax(1);
       sns = snsOutput[0][0].item().toFloat() > 0.5 ? 0 : 1;
-      hsvs = hsvsOutput[0][0].item().toFloat() > 0.5 ? 0 : 1;
+      if(w >= h) hsvs = hsvsOutput[0][0].item().toFloat() > 0.5 ? 0 : 1;
+      else hsvs = hsvsOutput[0][0].item().toFloat() > 0.5 ? 1 : 0;
 
       //cout<<output[0][0].item().toFloat()<<endl;
-      std::cout <<snsOutput.slice(/*dim=*/1, /*start=*/0, /*end=*/2) << '\n';
-      std::cout <<hsvsOutput.slice(/*dim=*/1, /*start=*/0, /*end=*/2) << '\n';
+      // std::cout <<snsOutput.slice(/*dim=*/1, /*start=*/0, /*end=*/2) << '\n';
+      // std::cout <<hsvsOutput.slice(/*dim=*/1, /*start=*/0, /*end=*/2) << '\n';
       tempCS->popCUPU(CS::getArea( *tempCS, tempCS->area, partitioner.chType ));
 
       auto endTime = std::chrono::steady_clock::now();
@@ -969,6 +970,11 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     else if( isModeSplit( currTestMode ))
     {
       if(sns == 0 /*&& cureuse!=1*/) continue;
+      else if(sns == 1 && (currTestMode.type == ETM_SPLIT_BT_H || currTestMode.type == ETM_SPLIT_TT_H) && hsvs == 1) 
+        continue;
+      else if(sns == 1 && (currTestMode.type == ETM_SPLIT_BT_V || currTestMode.type == ETM_SPLIT_TT_V) && hsvs == 0) 
+        continue;
+
       if (bestCS->cus.size() != 0)
       {
         splitmode = bestCS->cus[0]->splitSeries;

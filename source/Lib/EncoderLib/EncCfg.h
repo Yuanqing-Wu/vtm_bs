@@ -801,13 +801,18 @@ public:
   EncCfg()
   {
     auto startTime  = std::chrono::steady_clock::now();
-    intra64x64 = torch::jit::load("/home/wgq/research/bs/cnn/model/16x8/model_epoch50.pt");
-    intra32x32 = torch::jit::load("/home/wgq/research/bs/cnn/model/16x8/model_epoch50.pt");
-    intra16x16 = torch::jit::load("/home/wgq/research/bs/cnn/model/16x8/model_epoch50.pt");
-    intra8x8   = torch::jit::load("/home/wgq/research/bs/cnn/model/16x8/model_epoch50.pt");
-    intra32x16 = torch::jit::load("/home/wgq/research/bs/cnn/model/16x8/model_epoch50.pt");
-    intra32x8  = torch::jit::load("/home/wgq/research/bs/cnn/model/16x8/model_epoch50.pt");
-    intra16x8  = torch::jit::load("/home/wgq/research/bs/cnn/model/16x8/model_epoch50.pt");
+    try {
+      intra64x64 = torch::jit::load("/home/wgq/research/bs/cnn/model/64x64/model_epoch4000.pt");
+      intra32x32 = torch::jit::load("/home/wgq/research/bs/cnn/model/32x32/model_epoch1600.pt");
+      intra16x16 = torch::jit::load("/home/wgq/research/bs/cnn/model/16x16/model_epoch800.pt");
+      intra8x8   = torch::jit::load("/home/wgq/research/bs/cnn/model/8x8/model_epoch800.pt");
+      intra32x16 = torch::jit::load("/home/wgq/research/bs/cnn/model/32x16/model_epoch1200.pt");
+      intra32x8  = torch::jit::load("/home/wgq/research/bs/cnn/model/32x8/model_epoch1000.pt");
+      intra16x8  = torch::jit::load("/home/wgq/research/bs/cnn/model/16x8/model_epoch2000.pt");
+    }
+    catch (const c10::Error& e) {
+        std::cerr << "error loading the model\n";
+    }
 
     auto endTime = std::chrono::steady_clock::now();
     cnnTime += std::chrono::duration_cast<std::chrono::microseconds>( endTime - startTime).count();
