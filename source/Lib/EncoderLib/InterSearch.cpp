@@ -2249,26 +2249,26 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
   CodingStructure& cs = *cu.cs;
 
   AMVPInfo     amvp[2];
-  Mv           cMvSrchRngLT;
-  Mv           cMvSrchRngRB;
+  Mv           cMvSrchRngLT;  // MV搜索范围 left top
+  Mv           cMvSrchRngRB;  // right below
 
   Mv           cMvZero;
 
-  Mv           cMv[2];
-  Mv           cMvBi[2];
-  Mv           cMvTemp[2][33];
+  Mv           cMv[2];  // 两个单向预测的最优MV
+  Mv           cMvBi[2]; // 两个双向预测的最优MV
+  Mv           cMvTemp[2][33]; // 2表示参考列表，33表示参考帧列表最多33帧
   Mv           cMvHevcTemp[2][33];
   int          iNumPredDir = cs.slice->isInterP() ? 1 : 2;
 
-  Mv           cMvPred[2][33];
+  Mv           cMvPred[2][33]; // MVP
 
-  Mv           cMvPredBi[2][33];
+  Mv           cMvPredBi[2][33]; //
   int          aaiMvpIdxBi[2][33];
 
   int          aaiMvpIdx[2][33];
   int          aaiMvpNum[2][33];
 
-  AMVPInfo     aacAMVPInfo[2][33];
+  AMVPInfo     aacAMVPInfo[2][33];  // 存储每一帧的AMVP信息
 
   int          iRefIdx[2]={0,0}; //If un-initialized, may cause SEGV in bi-directional prediction iterative stage.
   int          iRefIdxBi[2] = { -1, -1 };
@@ -2343,7 +2343,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     Distortion   uiCostTempL0[MAX_NUM_REF];
     for (int iNumRef=0; iNumRef < MAX_NUM_REF; iNumRef++)
     {
-      uiCostTempL0[iNumRef] = std::numeric_limits<Distortion>::max();
+      uiCostTempL0[iNumRef] = std::numeric_limits<Distortion>::max();  // cost全部设置为最大
     }
     uint32_t         uiBitsTempL0[MAX_NUM_REF];
 
@@ -2359,9 +2359,9 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     m_pcRdCost->selectMotionLambda( );
 
     unsigned imvShift = pu.cu->imv == IMV_HPEL ? 1 : (pu.cu->imv << 1);
-    if ( checkNonAffine )
+    if ( checkNonAffine )  // 不check affine模式
     {
-      //  Uni-directional prediction
+      //  Uni-directional prediction  单向运动估计
       for ( int iRefList = 0; iRefList < iNumPredDir; iRefList++ ) // 遍历两个参考列表
       {
         RefPicList  eRefPicList = ( iRefList ? REF_PIC_LIST_1 : REF_PIC_LIST_0 );
@@ -2376,7 +2376,9 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
               uiBitsTemp--;
             }
           }
-          xEstimateMvPredAMVP( pu, origBuf, eRefPicList, iRefIdxTemp, cMvPred[iRefList][iRefIdxTemp], amvp[eRefPicList], false, &biPDistTemp); // 运动估计
+
+          // AMVP 获取当前PU周围的最优运动信息，构建AMVP候选列表，没有进行运动估计
+          xEstimateMvPredAMVP( pu, origBuf, eRefPicList, iRefIdxTemp, cMvPred[iRefList][iRefIdxTemp], amvp[eRefPicList], false, &biPDistTemp); 
 
           aaiMvpIdx[iRefList][iRefIdxTemp] = pu.mvpIdx[eRefPicList];
           aaiMvpNum[iRefList][iRefIdxTemp] = pu.mvpNum[eRefPicList];
@@ -2405,12 +2407,12 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
               uiCostTemp += m_pcRdCost->getCost( uiBitsTemp );
             }
             else
-            {
+            { 
               xMotionEstimation( pu, origBuf, eRefPicList, cMvPred[iRefList][iRefIdxTemp], iRefIdxTemp, cMvTemp[iRefList][iRefIdxTemp], aaiMvpIdx[iRefList][iRefIdxTemp], uiBitsTemp, uiCostTemp, amvp[eRefPicList] );
             }
           }
           else
-          {
+          { // 运动估计，获取MVP和MVD
             xMotionEstimation( pu, origBuf, eRefPicList, cMvPred[iRefList][iRefIdxTemp], iRefIdxTemp, cMvTemp[iRefList][iRefIdxTemp], aaiMvpIdx[iRefList][iRefIdxTemp], uiBitsTemp, uiCostTemp, amvp[eRefPicList] );
           }
           if( cu.cs->sps->getUseBcw() && cu.BcwIdx == BCW_DEFAULT && cu.cs->slice->isInterB() )
@@ -2459,14 +2461,14 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
         ::memcpy(&(g_reusedUniMVs[idx1][idx2][idx3][idx4][0][0]), cMvTemp, 2 * 33 * sizeof(Mv));
         g_isReusedUniMVsFilled[idx1][idx2][idx3][idx4] = true;
       }
-      //  Bi-predictive Motion estimation
+      //  Bi-predictive Motion estimation 双向运动估计
       if( ( cs.slice->isInterB() ) && ( PU::isBipredRestriction( pu ) == false )
         && (cu.slice->getCheckLDC() || bcwIdx == BCW_DEFAULT || !m_affineModeSelected || !m_pcEncCfg->getUseBcwFast())
         )
       {
         bool doBiPred = true;
         tryBipred = 1;
-        cMvBi[0] = cMv[0];
+        cMvBi[0] = cMv[0];  // 用单向预测得到的信息初始化
         cMvBi[1] = cMv[1];
         iRefIdxBi[0] = iRefIdx[0];
         iRefIdxBi[1] = iRefIdx[1];
@@ -2476,7 +2478,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 
         uint32_t uiMotBits[2];
 
-        if(cs.picHeader->getMvdL1ZeroFlag())
+        if(cs.picHeader->getMvdL1ZeroFlag()) // L1为空，则使用广义B帧，需要对后向参考块进行运动补偿，再重新进行运动估计
         {
           xCopyAMVPInfo(&aacAMVPInfo[1][bestBiPRefIdxL1], &amvp[REF_PIC_LIST_1]);
           aaiMvpIdxBi[1][bestBiPRefIdxL1] = bestBiPMvpL1;

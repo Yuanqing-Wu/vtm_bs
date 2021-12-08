@@ -3783,7 +3783,7 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
   uint8_t bcwIdx = cu.BcwIdx;
   bool  testBcw = (bcwIdx != BCW_DEFAULT);
 
-  m_pcInterSearch->predInterSearch( cu, partitioner ); //帧间搜索
+  m_pcInterSearch->  ( cu, partitioner ); //帧间搜索
 
   bcwIdx = CU::getValidBcwIdx(cu);
   if( testBcw && bcwIdx == BCW_DEFAULT ) // Enabled Bcw but the search results is uni.
@@ -3811,7 +3811,7 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
   if( g_BcwSearchOrder[bcwLoopIdx] == BCW_DEFAULT )
     m_pcInterSearch->setAffineModeSelected((bestCS->cus.front()->affine && !(bestCS->cus.front()->firstPU->mergeFlag)));
 
-  tempCS->initStructData(encTestMode.qp);  // 这里tempCS会删除之前添加的CU PU
+  tempCS->initStructData(encTestMode.qp);  // 这里tempCS会删除之前添加的CU PU,只保存bestCS的CU和PU
 
   // 下面3个if是BCW的终止算法
   double skipTH = MAX_DOUBLE;
