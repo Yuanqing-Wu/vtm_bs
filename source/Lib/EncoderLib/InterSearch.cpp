@@ -2240,7 +2240,9 @@ bool InterSearch::predInterHashSearch(CodingUnit& cu, Partitioner& partitioner, 
   return true;
 }
 
-
+// 几个问题：
+// 1. 参考帧列表如何构建，在哪里构建？
+// 2. 参考MV列表如何构建，再哪里构建？
 //! search of the best candidate for inter prediction
 void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
 {
@@ -2360,10 +2362,10 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
     if ( checkNonAffine )
     {
       //  Uni-directional prediction
-      for ( int iRefList = 0; iRefList < iNumPredDir; iRefList++ )
+      for ( int iRefList = 0; iRefList < iNumPredDir; iRefList++ ) // 遍历两个参考列表
       {
         RefPicList  eRefPicList = ( iRefList ? REF_PIC_LIST_1 : REF_PIC_LIST_0 );
-        for (int iRefIdxTemp = 0; iRefIdxTemp < cs.slice->getNumRefIdx(eRefPicList); iRefIdxTemp++)
+        for (int iRefIdxTemp = 0; iRefIdxTemp < cs.slice->getNumRefIdx(eRefPicList); iRefIdxTemp++) // 遍历参考列表中的所有参考帧
         {
           uiBitsTemp = uiMbBits[iRefList];
           if ( cs.slice->getNumRefIdx(eRefPicList) > 1 )
@@ -2374,7 +2376,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
               uiBitsTemp--;
             }
           }
-          xEstimateMvPredAMVP( pu, origBuf, eRefPicList, iRefIdxTemp, cMvPred[iRefList][iRefIdxTemp], amvp[eRefPicList], false, &biPDistTemp);
+          xEstimateMvPredAMVP( pu, origBuf, eRefPicList, iRefIdxTemp, cMvPred[iRefList][iRefIdxTemp], amvp[eRefPicList], false, &biPDistTemp); // 运动估计
 
           aaiMvpIdx[iRefList][iRefIdxTemp] = pu.mvpIdx[eRefPicList];
           aaiMvpNum[iRefList][iRefIdxTemp] = pu.mvpNum[eRefPicList];
@@ -2500,7 +2502,7 @@ void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
             }
           }
           PelUnitBuf predBufTmp = m_tmpPredStorage[REF_PIC_LIST_1].getBuf( UnitAreaRelative(cu, pu) );
-          motionCompensation( pu, predBufTmp, REF_PIC_LIST_1 );
+          motionCompensation( pu, predBufTmp, REF_PIC_LIST_1 );  // 运动补偿
 
           uiMotBits[0] = uiBits[0] - uiMbBits[0];
           uiMotBits[1] = uiMbBits[1];
