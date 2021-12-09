@@ -59,6 +59,9 @@
 #include <chrono>
 
 int cnnTime = 0;
+int allTime = 0;
+int planarTime = 0;
+int loadTime = 0;
 
 //! \ingroup EncoderLib
 //! \{
@@ -685,10 +688,12 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   int posx = partitioner.currArea().lx();
   int posy = partitioner.currArea().ly();
 
+  EncTestMode currTestM = m_modeCtrl->currTestMode();
+
   int sns = -1;  // -1：uncertain;  0：non-split;   1:split;
   int hsvs = -1; // -1：uncertain;  0：hs;          1:vs;
-  if (isLuma(partitioner.chType)
-  && w < 128 && w != 4 && h != 4
+  if (isLuma(partitioner.chType) && currTestM.type != ETM_RECO_CACHED
+  && w < 64 && w != 4 && h != 4 //&& w == 32 && h == 32
   && (w + posx) <= tempCS->picture->lwidth()
   && (h + posy) <= tempCS->picture->lheight())
   {
@@ -700,11 +705,15 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     if(!canQt && !canBh && !canBv && !canTh && !canTv) sns = 0;
     else if(!canNo) sns = 1;
 
+    if(currTestM.type != ETM_INTRA) sns = 1;
+
     if((!canBh && !canTh) && (canBv || canTv)) hsvs = 1;
     if((!canBv && !canTv) && (canBh || canTh)) hsvs = 0;
 
     // Algoritm
     if(sns != 0 && !(sns == 1 && hsvs != -1)){
+
+      auto startTimeP  = std::chrono::steady_clock::now();
 
       // Get origin buffer and planar prediction buffer
       CodingUnit &planarCU = tempCS->initCU( CS::getArea( *tempCS, tempCS->area, partitioner.chType ), partitioner.chType );
@@ -742,6 +751,10 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       memcpy(preL.data + sizeof(short) * w  * i, piPred.buf + piPred.stride * i , sizeof(short) * w);
       }
 
+      auto endTimeP = std::chrono::steady_clock::now();
+      planarTime += std::chrono::duration_cast<std::chrono::microseconds>( endTimeP - startTimeP).count();
+
+
       orgL.convertTo(orgL, CV_32FC1, 0.25f/127.5f, 0);
       preL.convertTo(preL, CV_32FC1, 0.25f/127.5f, 0);
 
@@ -773,6 +786,8 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       orgL_tensor = orgL_tensor - 1;
       preL_tensor = preL_tensor - 1;
 
+      preL_tensor = preL_tensor - orgL_tensor;
+
       auto qp = (torch::ones({1, 1}).to(torch::kFloat32))*tempCS->baseQP;
 
       // torch::Tensor imageBatch = torch::ones({1, 1, 32, 32});
@@ -789,7 +804,10 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       torch::NoGradGuard no_grad_guard;
       torch::globalContext().setFlushDenormal(true);
 
+      auto startTimeCnn  = std::chrono::steady_clock::now();
       auto output = module->forward(input).toTuple();
+      auto endTimeCnn = std::chrono::steady_clock::now();
+
       at::Tensor snsOutput = output->elements()[0].toTensor();
       at::Tensor hsvsOutput = output->elements()[1].toTensor();
       snsOutput = snsOutput.softmax(1);
@@ -798,23 +816,26 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       if(w >= h) hsvs = hsvsOutput[0][0].item().toFloat() > 0.5 ? 0 : 1;
       else hsvs = hsvsOutput[0][0].item().toFloat() > 0.5 ? 1 : 0;
 
+      
+      cnnTime += std::chrono::duration_cast<std::chrono::microseconds>( endTimeCnn - startTimeCnn).count();
+
       //cout<<output[0][0].item().toFloat()<<endl;
       // std::cout <<snsOutput.slice(/*dim=*/1, /*start=*/0, /*end=*/2) << '\n';
       // std::cout <<hsvsOutput.slice(/*dim=*/1, /*start=*/0, /*end=*/2) << '\n';
       tempCS->popCUPU(CS::getArea( *tempCS, tempCS->area, partitioner.chType ));
-
-      auto endTime = std::chrono::steady_clock::now();
-      cnnTime += std::chrono::duration_cast<std::chrono::microseconds>( endTime - startTime).count();
     }
-  }
 
-  // int cureuse = -1;
-  // EncTestMode currTestM = m_modeCtrl->currTestMode();
-  // if(partitioner.chType == CHANNEL_TYPE_LUMA)
+    auto endTime = std::chrono::steady_clock::now();
+    allTime += std::chrono::duration_cast<std::chrono::microseconds>( endTime - startTime).count();
+  }
+  // hsvs = -1;
+
+  // bool cureuse = false;
+  // if(partitioner.chType == CHANNEL_TYPE_LUMA && currTestM.type != ETM_INTRA && sns == 0)
   // {
-  //   if(currTestM.type != ETM_INTRA /*&& sns == 0*/)
-  //     cureuse = 1;
-  // }
+  //   cureuse = true;
+  // } 
+
   do
   {
     for (int i = compBegin; i < (compBegin + numComp); i++)
@@ -825,10 +846,10 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
     EncTestMode currTestMode = m_modeCtrl->currTestMode();
     currTestMode.maxCostAllowed = maxCostAllowed;
-  //   if (isLuma(partitioner.chType)
-  //   && partitioner.currArea().lwidth() == 32 && partitioner.currArea().lheight() == 32
-  //   && (partitioner.currArea().lwidth() + partitioner.currArea().lx()) <= tempCS->picture->lwidth()
-  //   && (partitioner.currArea().lheight() + partitioner.currArea().ly()) <= tempCS->picture->lheight())
+  // if(isLuma(partitioner.chType)
+  // && w < 128 && w != 4 && h != 4 //&& !(w == 8 && h == 8)
+  // && (w + posx) <= tempCS->picture->lwidth()
+  // && (h + posy) <= tempCS->picture->lheight())
   // {
   //   printf("%d,%d,%d,%d,%d,%d\n", partitioner.currArea().lx(), partitioner.currArea().ly(),
   //       partitioner.currArea().lwidth(), partitioner.currArea().lheight(), currTestMode.type, sns);
@@ -920,7 +941,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
     else if( currTestMode.type == ETM_INTRA )
     {
-      if(sns == 1) continue;
+      if(sns == 1 /*&& !cureuse*/) continue;
       if (slice.getSPS()->getUseColorTrans() && !CS::isDualITree(*tempCS))
       {
         bool skipSecColorSpace = false;
@@ -969,7 +990,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
     else if( isModeSplit( currTestMode ))
     {
-      if(sns == 0 /*&& cureuse!=1*/) continue;
+      if(sns == 0 && currTestMode.type != ETM_SPLIT_QT /*&& cureuse!=1*/) continue;
       else if(sns == 1 && (currTestMode.type == ETM_SPLIT_BT_H || currTestMode.type == ETM_SPLIT_TT_H) && hsvs == 1) 
         continue;
       else if(sns == 1 && (currTestMode.type == ETM_SPLIT_BT_V || currTestMode.type == ETM_SPLIT_TT_V) && hsvs == 0) 
@@ -1054,16 +1075,16 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
   } while( m_modeCtrl->nextMode( *tempCS, partitioner ) );
 
-  //   if (isLuma(partitioner.chType)
-  //   && partitioner.currArea().lwidth() == 32 && partitioner.currArea().lheight() == 32
-  //   && (partitioner.currArea().lwidth() + partitioner.currArea().lx()) <= tempCS->picture->lwidth()
-  //   && (partitioner.currArea().lheight() + partitioner.currArea().ly()) <= tempCS->picture->lheight())
+  // if(isLuma(partitioner.chType)
+  // && w < 128 && w != 4 && h != 4 //&& !(w == 8 && h == 8)
+  // && (w + posx) <= tempCS->picture->lwidth()
+  // && (h + posy) <= tempCS->picture->lheight())
   // {
   // const ComprCUCtx& cuECtx = m_modeCtrl->getComprCUCtx();
   // if(cuECtx.extraFeaturesd[9] == bestCS->cost)
-  //   printf("non-split: %d\n", sns);
+  //   printf("%d,%d,%d,%d,%d,%d\n", posx, posy, w, h, 0, sns);
   // else
-  //   printf("split: %d\n", sns);
+  //   printf("%d,%d,%d,%d,%d,%d\n", posx, posy, w, h, 1, sns);
   // }
   //////////////////////////////////////////////////////////////////////////
   // Finishing CU

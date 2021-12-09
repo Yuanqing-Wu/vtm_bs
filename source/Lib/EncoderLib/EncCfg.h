@@ -59,6 +59,9 @@ using namespace EncCfgParam;
 #endif
 
 extern int cnnTime;
+extern int allTime;
+extern int planarTime;
+extern int loadTime;
 
 struct GOPEntry
 {
@@ -802,19 +805,20 @@ public:
   {
     auto startTime  = std::chrono::steady_clock::now();
     try {
-      intra64x64 = torch::jit::load("/home/wgq/research/bs/cnn/model/64x64/model_epoch4000.pt");
-      intra32x32 = torch::jit::load("/home/wgq/research/bs/cnn/model/32x32/model_epoch1600.pt");
-      intra16x16 = torch::jit::load("/home/wgq/research/bs/cnn/model/16x16/model_epoch800.pt");
-      intra8x8   = torch::jit::load("/home/wgq/research/bs/cnn/model/8x8/model_epoch800.pt");
-      intra32x16 = torch::jit::load("/home/wgq/research/bs/cnn/model/32x16/model_epoch1200.pt");
-      intra32x8  = torch::jit::load("/home/wgq/research/bs/cnn/model/32x8/model_epoch1000.pt");
-      intra16x8  = torch::jit::load("/home/wgq/research/bs/cnn/model/16x8/model_epoch2000.pt");
+      intra64x64 = torch::jit::load("/home/wgq/research/bs/cnn/model/64x64/model_epoch50.pt");
+      intra32x32 = torch::jit::load("/home/wgq/research/bs/cnn/model/32x32/model_epoch50.pt");
+      intra16x16 = torch::jit::load("/home/wgq/research/bs/cnn/model/16x16/model_epoch50.pt");
+      intra8x8   = torch::jit::load("/home/wgq/research/bs/cnn/model/8x8/model_epoch50.pt");
+      intra32x16 = torch::jit::load("/home/wgq/research/bs/cnn/model/32x16/model_epoch50.pt");
+      intra32x8  = torch::jit::load("/home/wgq/research/bs/cnn/model/32x8/model_epoch50.pt");
+      intra16x8  = torch::jit::load("/home/wgq/research/bs/cnn/model/16x8/model_epoch50.pt");
     }
     catch (const c10::Error& e) {
         std::cerr << "error loading the model\n";
     }
 
     auto endTime = std::chrono::steady_clock::now();
+    loadTime = std::chrono::duration_cast<std::chrono::microseconds>( endTime - startTime).count();
     cnnTime += std::chrono::duration_cast<std::chrono::microseconds>( endTime - startTime).count();
   }
 
@@ -828,7 +832,10 @@ public:
 
   virtual ~EncCfg()
   {
+    printf("ALL Time: %12.3f\n", allTime/1000000.0);
     printf("CNN Time: %12.3f\n", cnnTime/1000000.0);
+    printf("Planar Time: %12.3f\n", planarTime/1000000.0);
+    printf("Load Time: %12.3f\n", loadTime/1000000.0);
   }
 
   void setProfile(Profile::Name profile) { m_profile = profile; }
