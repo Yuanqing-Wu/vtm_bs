@@ -3756,8 +3756,8 @@ void InterSearch::xTZSearch( const PredictionUnit& pu,
     cTmpMv.changePrecision(MV_PRECISION_INTERNAL, MV_PRECISION_INT);
     m_cDistParam.cur.buf = cStruct.piRefY + (cTmpMv.ver * cStruct.iRefStride) + cTmpMv.hor;
 
-    Distortion uiSad = m_cDistParam.distFunc(m_cDistParam);
-    uiSad += m_pcRdCost->getCostOfVectorWithPredictor(cTmpMv.hor, cTmpMv.ver, cStruct.imvShift);
+    Distortion uiSad = m_cDistParam.distFunc(m_cDistParam); // 像素SAD
+    uiSad += m_pcRdCost->getCostOfVectorWithPredictor(cTmpMv.hor, cTmpMv.ver, cStruct.imvShift); // MV dist
     if (uiSad < cStruct.uiBestSad)
     {
       cStruct.uiBestSad = uiSad;

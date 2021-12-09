@@ -527,10 +527,6 @@ bool EncCu::xCheckBestMode( CodingStructure *&tempCS, CodingStructure *&bestCS, 
 
 }
 
-// 几个问题：
-// 1. AddCU()，AddPU()如何使用，效果是什么
-// 2. 底层CS如何传递给顶层CS
-// 3. RDO的过程具体式如何实现
 void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Partitioner& partitioner, double maxCostAllowed )
 {
   CHECK(maxCostAllowed < 0, "Wrong value of maxCostAllowed!");
@@ -638,7 +634,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
   }
 
-  if( !m_modeCtrl->anyMode() )  // 没有可选模式，结束CU编码
+  if( !m_modeCtrl->anyMode() )
   {
     m_modeCtrl->finishCULevel( partitioner );
     return;
@@ -686,7 +682,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
       tempCS->prevPLT.curPLTSize[comID] = curLastPLTSize[comID];
       memcpy(tempCS->prevPLT.curPLT[i], curLastPLT[i], curLastPLTSize[comID] * sizeof(Pel));
     }
-    EncTestMode currTestMode = m_modeCtrl->currTestMode();  //获取当前编码模式
+    EncTestMode currTestMode = m_modeCtrl->currTestMode();
     currTestMode.maxCostAllowed = maxCostAllowed;
 
     if (pps.getUseDQP() && partitioner.isSepTree(*tempCS) && isChroma( partitioner.chType ))
@@ -920,8 +916,6 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   {
     //although some coding modes were planned to be tried in RDO, no coding mode actually finished encoding due to early termination
     //thus tempCS->cost and bestCS->cost are both MAX_DOUBLE; in this case, skip the following process for normal case
-    //虽然计划在RDO中尝试一些编码模式，但由于提前终止，没有编码模式真正完成编码，因此tempCS->cost和bestCS->cost都是MAX_DOUBLE； 
-    //在这种情况下，跳过以下过程
     m_modeCtrl->finishCULevel( partitioner );
     return;
   }
@@ -950,7 +944,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     const CodingUnit&     cu = *bestCS->cus.front();
 
     bool isIbcSmallBlk = CU::isIBC(cu) && (cu.lwidth() * cu.lheight() <= 16);
-    CU::saveMotionInHMVP( cu, isIbcSmallBlk );  //保存MV作为HMVP
+    CU::saveMotionInHMVP( cu, isIbcSmallBlk );
   }
   bestCS->picture->getPredBuf(currCsArea).copyFrom(bestCS->getPredBuf(currCsArea));
   bestCS->picture->getRecoBuf( currCsArea ).copyFrom( bestCS->getRecoBuf( currCsArea ) );
@@ -967,7 +961,7 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
   }
 
 #endif
-  if (bestCS->cus.size() == 1) // no partition 处理没有划分的情况
+  if (bestCS->cus.size() == 1) // no partition
   {
     CHECK(bestCS->cus[0]->tileIdx != bestCS->pps->getTileIdx(bestCS->area.lumaPos()), "Wrong tile index!");
     if (bestCS->cus[0]->predMode == MODE_PLT)
@@ -3713,7 +3707,7 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
 
 void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode )
 {
-  tempCS->initStructData( encTestMode.qp );  // 清除当前CS的所有CU PU TU
+  tempCS->initStructData( encTestMode.qp );
 
 
   m_pcInterSearch->setAffineModeSelected(false);
@@ -3726,10 +3720,7 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
 
   m_pcInterSearch->resetBufferedUniMotions();
   int bcwLoopNum = (tempCS->slice->isInterB() ? BCW_NUM : 1);
-  bcwLoopNum = (tempCS->sps->getUseBcw() ? bcwLoopNum : 1); 
-  // BCW 双向CU加权预测 BCW 预定义了 5 个固定权重{2, 3, 4, 5, 10} /8，当所有参考图片
-  // 在时间结构上都在当前图片之前时，可以使用所有五个权重。否则，只能
-  // 使用权重子集 {3,4,5}/8
+  bcwLoopNum = (tempCS->sps->getUseBcw() ? bcwLoopNum : 1);
 
   if( tempCS->area.lwidth() * tempCS->area.lheight() < BCW_SIZE_CONSTRAINT )
   {
@@ -3766,7 +3757,7 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
       }
     }
 
-  CodingUnit &cu      = tempCS->addCU( tempCS->area, partitioner.chType ); // 每个BCW权重都会添加一个CU，但是都是给TempCS添加
+  CodingUnit &cu      = tempCS->addCU( tempCS->area, partitioner.chType );
 
   partitioner.setCUData( cu );
   cu.slice            = tempCS->slice;
@@ -3777,13 +3768,13 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
   cu.predMode         = MODE_INTER;
   cu.chromaQpAdj      = m_cuChromaQpOffsetIdxPlus1;
   cu.qp               = encTestMode.qp;
-  CU::addPUs( cu );  // 为当前CU添加PU
+  CU::addPUs( cu );
 
   cu.BcwIdx = g_BcwSearchOrder[bcwLoopIdx];
   uint8_t bcwIdx = cu.BcwIdx;
   bool  testBcw = (bcwIdx != BCW_DEFAULT);
 
-  m_pcInterSearch->  ( cu, partitioner ); //帧间搜索
+  m_pcInterSearch->predInterSearch( cu, partitioner );
 
   bcwIdx = CU::getValidBcwIdx(cu);
   if( testBcw && bcwIdx == BCW_DEFAULT ) // Enabled Bcw but the search results is uni.
@@ -3802,7 +3793,6 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
     }
   }
 
-  // 编码CU， check tempCS和bestCS并交换
   xEncodeInterResidual( tempCS, bestCS, partitioner, encTestMode, 0
                         , 0
                         , &equBcwCost
@@ -3811,17 +3801,16 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
   if( g_BcwSearchOrder[bcwLoopIdx] == BCW_DEFAULT )
     m_pcInterSearch->setAffineModeSelected((bestCS->cus.front()->affine && !(bestCS->cus.front()->firstPU->mergeFlag)));
 
-  tempCS->initStructData(encTestMode.qp);  // 这里tempCS会删除之前添加的CU PU,只保存bestCS的CU和PU
+  tempCS->initStructData(encTestMode.qp);
 
-  // 下面3个if是BCW的终止算法
   double skipTH = MAX_DOUBLE;
   skipTH = (m_pcEncCfg->getUseBcwFast() ? 1.05 : MAX_DOUBLE);
-  if( equBcwCost > curBestCost * skipTH )   // 根据阈值
+  if( equBcwCost > curBestCost * skipTH )
   {
     break;
   }
 
-  if( m_pcEncCfg->getUseBcwFast() )  
+  if( m_pcEncCfg->getUseBcwFast() )
   {
     if( isEqualUni == true && m_pcEncCfg->getIntraPeriod() == -1 )
     {
