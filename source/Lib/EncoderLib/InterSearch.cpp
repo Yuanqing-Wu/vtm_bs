@@ -2240,6 +2240,84 @@ bool InterSearch::predInterHashSearch(CodingUnit& cu, Partitioner& partitioner, 
   return true;
 }
 
+//! search of the best candidate for inter prediction
+void InterSearch::simplePredInterSearch(CodingUnit& cu, Partitioner& partitioner)
+{
+  CodingStructure& cs = *cu.cs;
+
+  AMVPInfo     amvp;
+
+  Mv           cMvPred;
+
+  Mv           cMvTemp;
+
+  int          aaiMvpIdx;
+
+  AMVPInfo     aacAMVPInfo;
+
+  uint32_t         uiMbBits[3] = {1, 1, 0};
+
+  uint32_t         uiLastMode = 0;
+
+
+  // Loop over Prediction Units
+  CHECK(!cu.firstPU, "CU does not contain any PUs");
+  uint32_t         puIdx = 0;
+  auto &pu = *cu.firstPU;
+
+  {
+
+    CHECK(pu.cu != &cu, "PU is contained in another CU");
+
+    PU::spanMotionInfo( pu );
+    Distortion   uiCostTemp;
+
+    uint32_t         uiBitsTemp;
+
+    Distortion   uiCostTempL0[MAX_NUM_REF];
+    for (int iNumRef=0; iNumRef < MAX_NUM_REF; iNumRef++)
+    {
+      uiCostTempL0[iNumRef] = std::numeric_limits<Distortion>::max();
+    }
+    uint32_t         uiBitsTempL0[MAX_NUM_REF];
+
+    PelUnitBuf origBuf = pu.cs->getOrgBuf( pu );
+
+    xGetBlkBits( cs.slice->isInterP(), puIdx, uiLastMode, uiMbBits );
+
+    m_pcRdCost->selectMotionLambda( );
+
+    //  Uni-directional prediction
+    int iRefList = 0;
+
+    RefPicList  eRefPicList = REF_PIC_LIST_0;
+    int iRefIdxTemp = 0; // Determined as last frame
+    // for (int iRefIdxTemp = 0; iRefIdxTemp < cs.slice->getNumRefIdx(eRefPicList); iRefIdxTemp++)
+    //{
+      uiBitsTemp = uiMbBits[iRefList];
+      if ( cs.slice->getNumRefIdx(eRefPicList) > 1 )
+      {
+        uiBitsTemp += iRefIdxTemp+1;
+        if ( iRefIdxTemp == cs.slice->getNumRefIdx(eRefPicList)-1 )
+        {
+          uiBitsTemp--;
+        }
+      }
+      xEstimateMvPredAMVP( pu, origBuf, eRefPicList, iRefIdxTemp, cMvPred, amvp, false, &biPDistTemp);
+
+      aaiMvpIdx = pu.mvpIdx[eRefPicList];
+
+      uiBitsTemp += m_auiMVPIdxCost[aaiMvpIdx][AMVP_MAX_NUM_CANDS];
+
+      xMotionEstimation( pu, origBuf, eRefPicList, cMvPred, iRefIdxTemp, cMvTemp, aaiMvpIdx, uiBitsTemp, uiCostTemp, amvp);
+
+    // }
+  }
+    // if (B_SLICE)
+
+  return;
+}
+
 
 //! search of the best candidate for inter prediction
 void InterSearch::predInterSearch(CodingUnit& cu, Partitioner& partitioner)
@@ -3503,7 +3581,7 @@ void InterSearch::xSetSearchRange ( const PredictionUnit& pu,
   const int iMvShift = MV_FRACTIONAL_BITS_INTERNAL;
   Mv cFPMvPred = cMvPred;
   clipMv( cFPMvPred, pu.cu->lumaPos(), pu.cu->lumaSize(), *pu.cs->sps, *pu.cs->pps );
-  
+
   Mv mvTL(cFPMvPred.getHor() - (iSrchRng << iMvShift), cFPMvPred.getVer() - (iSrchRng << iMvShift));
   Mv mvBR(cFPMvPred.getHor() + (iSrchRng << iMvShift), cFPMvPred.getVer() + (iSrchRng << iMvShift));
 
@@ -6653,7 +6731,7 @@ void InterSearch::xEstimateInterResidualQT(CodingStructure &cs, Partitioner &par
           Distortion nonCoeffDist = 0;
           double     nonCoeffCost = 0;
 
-#if JVET_S0234_ACT_CRS_FIX 
+#if JVET_S0234_ACT_CRS_FIX
           if (!colorTransFlag && slice.getLmcsEnabledFlag() && isChroma(compID) && slice.getPicHeader()->getLmcsChromaResidualScaleFlag() && tu.blocks[compID].width*tu.blocks[compID].height > 4)
 #else
           if (slice.getLmcsEnabledFlag() && isChroma(compID) && slice.getPicHeader()->getLmcsChromaResidualScaleFlag() && tu.blocks[compID].width * tu.blocks[compID].height > 4)

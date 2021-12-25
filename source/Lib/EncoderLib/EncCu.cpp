@@ -674,6 +674,18 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
   }
 
+  uint64_t NSbits = 0;
+  Distortion NSdist = 0;
+
+  bool interAlgoritm = true;
+
+  if(interAlgoritm)
+  {
+      // Get ns var and sse
+      xSimpleMotionSearch( tempCS, bestCS, partitioner, currTestMode );
+
+  }
+
   do
   {
     for (int i = compBegin; i < (compBegin + numComp); i++)
@@ -741,6 +753,8 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
         tempCS->bestCS = bestCS;
         xCheckRDCostInter( tempCS, bestCS, partitioner, currTestMode );
         tempCS->bestCS = nullptr;
+        NSbits = bestCS->fracBits;
+        NSdist = bestCS->dist;
       }
 
     }
@@ -1941,7 +1955,7 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 void EncCu::xCheckPLT(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode)
 {
   if (((partitioner.currArea().lumaSize().width * partitioner.currArea().lumaSize().height <= 16) && (isLuma(partitioner.chType)) )
-        || ((partitioner.currArea().chromaSize().width * partitioner.currArea().chromaSize().height <= 16) && (!isLuma(partitioner.chType)) && partitioner.isSepTree(*tempCS) ) 
+        || ((partitioner.currArea().chromaSize().width * partitioner.currArea().chromaSize().height <= 16) && (!isLuma(partitioner.chType)) && partitioner.isSepTree(*tempCS) )
       || (partitioner.isLocalSepTree(*tempCS)  && (!isLuma(partitioner.chType))  )  )
   {
     return;
@@ -3704,6 +3718,31 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
 }
   // check ibc mode in encoder RD
   //////////////////////////////////////////////////////////////////////////////////////////////
+
+void EncCu::xSimpleMotionSearch( CodingStructure *&tempCS, Partitioner &partitioner, int64_t *sse, int64_t *var)
+{
+  tempCS->initStructData( tempCS->baseQP );
+
+  m_pcInterSearch->setAffineModeSelected(false);
+
+  CodingUnit &cu      = tempCS->addCU( tempCS->area, partitioner.chType );
+
+  partitioner.setCUData( cu );
+  cu.slice            = tempCS->slice;
+  cu.tileIdx          = tempCS->pps->getTileIdx( tempCS->area.lumaPos() );
+  cu.skip             = false;
+  cu.mmvdSkip = false;
+//cu.affine
+  cu.predMode         = MODE_INTER;
+  cu.chromaQpAdj      = m_cuChromaQpOffsetIdxPlus1;
+  cu.qp               = tempCS->baseQP;
+  CU::addPUs( cu );
+
+  m_pcInterSearch->simplePredInterSearch( cu, partitioner );
+
+  tempCS->initStructData(tempCS->baseQP);
+
+}
 
 void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode )
 {

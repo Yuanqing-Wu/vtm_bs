@@ -363,6 +363,7 @@ public:
 
   void setModeCtrl( EncModeCtrl *modeCtrl ) { m_modeCtrl = modeCtrl;}
 
+  void simplePredInterSearch(CodingUnit& cu, Partitioner& partitioner);
   void predInterSearch(CodingUnit& cu, Partitioner& partitioner );
 
   /// set ME search range
