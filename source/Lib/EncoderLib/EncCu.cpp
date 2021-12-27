@@ -1941,7 +1941,7 @@ bool EncCu::xCheckRDCostIntra(CodingStructure *&tempCS, CodingStructure *&bestCS
 void EncCu::xCheckPLT(CodingStructure *&tempCS, CodingStructure *&bestCS, Partitioner &partitioner, const EncTestMode& encTestMode)
 {
   if (((partitioner.currArea().lumaSize().width * partitioner.currArea().lumaSize().height <= 16) && (isLuma(partitioner.chType)) )
-        || ((partitioner.currArea().chromaSize().width * partitioner.currArea().chromaSize().height <= 16) && (!isLuma(partitioner.chType)) && partitioner.isSepTree(*tempCS) ) 
+        || ((partitioner.currArea().chromaSize().width * partitioner.currArea().chromaSize().height <= 16) && (!isLuma(partitioner.chType)) && partitioner.isSepTree(*tempCS) )
       || (partitioner.isLocalSepTree(*tempCS)  && (!isLuma(partitioner.chType))  )  )
   {
     return;
@@ -3774,7 +3774,8 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
   uint8_t bcwIdx = cu.BcwIdx;
   bool  testBcw = (bcwIdx != BCW_DEFAULT);
 
-  m_pcInterSearch->predInterSearch( cu, partitioner );
+
+  m_pcInterSearch->predInterSearch  ( cu, partitioner ); //帧间搜索
 
   bcwIdx = CU::getValidBcwIdx(cu);
   if( testBcw && bcwIdx == BCW_DEFAULT ) // Enabled Bcw but the search results is uni.

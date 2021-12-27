@@ -479,7 +479,7 @@ void Slice::constructRefPicList(PicList& rcListPic)
   Picture*  pcRefPic = NULL;
   uint32_t numOfActiveRef = 0;
   //construct L0
-  numOfActiveRef = getNumRefIdx(REF_PIC_LIST_0);
+  numOfActiveRef = getNumRefIdx(REF_PIC_LIST_0);  //从配置文件获取
   int layerIdx = m_pcPic->cs->vps == nullptr ? 0 : m_pcPic->cs->vps->getGeneralLayerIdx( m_pcPic->layerId );
 
   for (int ii = 0; ii < numOfActiveRef; ii++)
