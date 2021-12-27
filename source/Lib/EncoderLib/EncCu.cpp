@@ -3783,7 +3783,7 @@ void EncCu::xCheckRDCostInter( CodingStructure *&tempCS, CodingStructure *&bestC
   uint8_t bcwIdx = cu.BcwIdx;
   bool  testBcw = (bcwIdx != BCW_DEFAULT);
 
-  m_pcInterSearch->  ( cu, partitioner ); //帧间搜索
+  m_pcInterSearch->predInterSearch  ( cu, partitioner ); //帧间搜索
 
   bcwIdx = CU::getValidBcwIdx(cu);
   if( testBcw && bcwIdx == BCW_DEFAULT ) // Enabled Bcw but the search results is uni.
