@@ -394,6 +394,8 @@ protected:
   // Inter search (AMP)
   // -------------------------------------------------------------------------------------------------------------------
 
+void xEstimateMvPredAMVPSpatial( PredictionUnit& pu, PelUnitBuf& origBuf, RefPicList eRefPicList, int iRefIdx, Mv& rcMvPred, AMVPInfo& rAMVPInfo, bool bFilled);
+
   void xEstimateMvPredAMVP        ( PredictionUnit&       pu,
                                     PelUnitBuf&           origBuf,
                                     RefPicList            eRefPicList,
@@ -435,6 +437,8 @@ protected:
   // -------------------------------------------------------------------------------------------------------------------
   // motion estimation
   // -------------------------------------------------------------------------------------------------------------------
+
+void xSimpleMotionEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, RefPicList eRefPicList, Mv& rcMvPred, int iRefIdxPred, Mv& rcMv, int& riMVPIdx, uint32_t& ruiBits, Distortion& ruiCost, const AMVPInfo& amvpInfo);
 
   void xMotionEstimation          ( PredictionUnit&       pu,
                                     PelUnitBuf&           origBuf,

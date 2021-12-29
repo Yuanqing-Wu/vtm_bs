@@ -53,6 +53,17 @@
 #include <cmath>
 #include <algorithm>
 
+#include <opencv2/opencv.hpp>
+
+int calVariance(cv::Mat &src)
+{
+  cv::Scalar mean;
+  cv::Scalar stddev;
+  cv::meanStdDev(src, mean, stddev);
+  int var = stddev.val[0] * stddev.val[0];
+  return var;
+}
+
 
 
 //! \ingroup EncoderLib
@@ -674,15 +685,36 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
     }
   }
 
-  uint64_t NSbits = 0;
-  Distortion NSdist = 0;
+//   uint64_t NSbits = 0;
+//   Distortion NSdist = 0;
+
 
   bool interAlgoritm = true;
 
-  if(interAlgoritm)
+  int cu_w = partitioner.currArea().lwidth();
+  int cu_h = partitioner.currArea().lheight();
+
+  if(interAlgoritm && tempCS->slice->getSliceType() != I_SLICE)
   {
+    int sse = 0;
+    int var = 0;
+    Distortion   uiCostTemp;
       // Get ns var and sse
-      xSimpleMotionSearch( tempCS, bestCS, partitioner, currTestMode );
+    xSimpleMotionSearch( tempCS, partitioner);
+
+    CPelBuf orgLuma = tempCS->picture->getTrueOrigBuf(partitioner.currArea().blocks[COMPONENT_Y]);
+    PelBuf piPred = tempCS->getPredBuf(tempCS->cus[0]->firstPU->Y());
+
+    cv::Mat orgL = cv::Mat(cu_h, cu_w, CV_16UC1);
+    cv::Mat preL = cv::Mat(cu_h, cu_w, CV_16UC1);
+
+    for( int i = 0; i < cu_h; ++i )
+    {
+        memcpy(orgL.data + sizeof(short) * cu_w * i, orgLuma.buf + orgLuma.stride * i, sizeof(short) * cu_w);
+        memcpy(preL.data + sizeof(short) * cu_w * i, piPred.buf + piPred.stride * i, sizeof(short) * cu_w);
+    }
+
+    int var = calVariance(preL-orgL);
 
   }
 
@@ -753,8 +785,8 @@ void EncCu::xCompressCU( CodingStructure*& tempCS, CodingStructure*& bestCS, Par
         tempCS->bestCS = bestCS;
         xCheckRDCostInter( tempCS, bestCS, partitioner, currTestMode );
         tempCS->bestCS = nullptr;
-        NSbits = bestCS->fracBits;
-        NSdist = bestCS->dist;
+        // NSbits = bestCS->fracBits;
+        // NSdist = bestCS->dist;
       }
 
     }
@@ -3719,7 +3751,7 @@ void EncCu::xCheckRDCostIBCMode(CodingStructure *&tempCS, CodingStructure *&best
   // check ibc mode in encoder RD
   //////////////////////////////////////////////////////////////////////////////////////////////
 
-void EncCu::xSimpleMotionSearch( CodingStructure *&tempCS, Partitioner &partitioner, int64_t *sse, int64_t *var)
+void EncCu::xSimpleMotionSearch( CodingStructure *&tempCS, Partitioner &partitioner)
 {
   tempCS->initStructData( tempCS->baseQP );
 

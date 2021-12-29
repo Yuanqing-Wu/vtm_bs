@@ -177,7 +177,7 @@ void CU::checkConformanceILRP(Slice *slice)
   }
 #endif
 
-  //constraint 1: The picture referred to by each active entry in RefPicList[ 0 ] or RefPicList[ 1 ] has the same subpicture layout as the current picture 
+  //constraint 1: The picture referred to by each active entry in RefPicList[ 0 ] or RefPicList[ 1 ] has the same subpicture layout as the current picture
   bool isAllRefSameSubpicLayout = true;
   for (int refList = 0; refList < numRefList; refList++) // loop over l0 and l1
   {
@@ -817,7 +817,7 @@ uint32_t PU::getCoLocatedIntraLumaMode(const PredictionUnit &pu)
 
 int PU::getWideAngle( const TransformUnit &tu, const uint32_t dirMode, const ComponentID compID )
 {
-  //This function returns a wide angle index taking into account that the values 0 and 1 are reserved 
+  //This function returns a wide angle index taking into account that the values 0 and 1 are reserved
   //for Planar and DC respectively, as defined in the Spec. Text.
   if( dirMode < 2 )
   {
@@ -1935,6 +1935,79 @@ void PU::fillMvpCand(PredictionUnit &pu, const RefPicList &eRefPicList, const in
     const int currRefPOC = cs.slice->getRefPic(eRefPicList, refIdx)->getPOC();
     addAMVPHMVPCand(pu, eRefPicList, currRefPOC, *pInfo);
   }
+
+  if (pInfo->numCand > AMVP_MAX_NUM_CANDS)
+  {
+    pInfo->numCand = AMVP_MAX_NUM_CANDS;
+  }
+
+  while (pInfo->numCand < AMVP_MAX_NUM_CANDS)
+  {
+    pInfo->mvCand[pInfo->numCand] = Mv( 0, 0 );
+    pInfo->numCand++;
+  }
+
+  for (Mv &mv : pInfo->mvCand)
+  {
+    mv.roundTransPrecInternal2Amvr(pu.cu->imv);
+  }
+}
+
+void PU::fillMvpCandSpatial(PredictionUnit &pu, const RefPicList &eRefPicList, const int &refIdx, AMVPInfo &amvpInfo)
+{
+
+  AMVPInfo *pInfo = &amvpInfo;
+
+  pInfo->numCand = 0;
+
+  if (refIdx < 0)
+  {
+    return;
+  }
+
+  //-- Get Spatial MV
+  Position posLT = pu.Y().topLeft();
+  Position posRT = pu.Y().topRight();
+  Position posLB = pu.Y().bottomLeft();
+
+  {
+    bool bAdded = addMVPCandUnscaled( pu, eRefPicList, refIdx, posLB, MD_BELOW_LEFT, *pInfo );
+
+    if( !bAdded )
+    {
+      bAdded = addMVPCandUnscaled( pu, eRefPicList, refIdx, posLB, MD_LEFT, *pInfo );
+
+    }
+  }
+
+  // Above predictor search
+  {
+    bool bAdded = addMVPCandUnscaled( pu, eRefPicList, refIdx, posRT, MD_ABOVE_RIGHT, *pInfo );
+
+    if( !bAdded )
+    {
+      bAdded = addMVPCandUnscaled( pu, eRefPicList, refIdx, posRT, MD_ABOVE, *pInfo );
+
+      if( !bAdded )
+      {
+        addMVPCandUnscaled( pu, eRefPicList, refIdx, posLT, MD_ABOVE_LEFT, *pInfo );
+      }
+    }
+  }
+
+  for( int i = 0; i < pInfo->numCand; i++ )
+  {
+    pInfo->mvCand[i].roundTransPrecInternal2Amvr(pu.cu->imv);
+  }
+
+  if( pInfo->numCand == 2 )
+  {
+    if( pInfo->mvCand[0] == pInfo->mvCand[1] )
+    {
+      pInfo->numCand = 1;
+    }
+  }
+
 
   if (pInfo->numCand > AMVP_MAX_NUM_CANDS)
   {

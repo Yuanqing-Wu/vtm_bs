@@ -2265,7 +2265,6 @@ void InterSearch::simplePredInterSearch(CodingUnit& cu, Partitioner& partitioner
   uint32_t         puIdx = 0;
   auto &pu = *cu.firstPU;
 
-  {
 
     CHECK(pu.cu != &cu, "PU is contained in another CU");
 
@@ -2273,13 +2272,6 @@ void InterSearch::simplePredInterSearch(CodingUnit& cu, Partitioner& partitioner
     Distortion   uiCostTemp;
 
     uint32_t         uiBitsTemp;
-
-    Distortion   uiCostTempL0[MAX_NUM_REF];
-    for (int iNumRef=0; iNumRef < MAX_NUM_REF; iNumRef++)
-    {
-      uiCostTempL0[iNumRef] = std::numeric_limits<Distortion>::max();
-    }
-    uint32_t         uiBitsTempL0[MAX_NUM_REF];
 
     PelUnitBuf origBuf = pu.cs->getOrgBuf( pu );
 
@@ -2303,17 +2295,16 @@ void InterSearch::simplePredInterSearch(CodingUnit& cu, Partitioner& partitioner
           uiBitsTemp--;
         }
       }
-      xEstimateMvPredAMVP( pu, origBuf, eRefPicList, iRefIdxTemp, cMvPred, amvp, false, &biPDistTemp);
+      xEstimateMvPredAMVPSpatial( pu, origBuf, eRefPicList, iRefIdxTemp, cMvPred, amvp, false);
 
       aaiMvpIdx = pu.mvpIdx[eRefPicList];
 
       uiBitsTemp += m_auiMVPIdxCost[aaiMvpIdx][AMVP_MAX_NUM_CANDS];
 
-      xMotionEstimation( pu, origBuf, eRefPicList, cMvPred, iRefIdxTemp, cMvTemp, aaiMvpIdx, uiBitsTemp, uiCostTemp, amvp);
+      xSimpleMotionEstimation( pu, origBuf, eRefPicList, cMvPred, iRefIdxTemp, cMvTemp, aaiMvpIdx, uiBitsTemp, uiCostTemp, amvp);
 
     // }
-  }
-    // if (B_SLICE)
+
 
   return;
 }
@@ -3163,6 +3154,48 @@ uint32_t InterSearch::xCalcAffineMVBits( PredictionUnit& pu, Mv acMvTemp[3], Mv 
 }
 
 // AMVP
+void InterSearch::xEstimateMvPredAMVPSpatial( PredictionUnit& pu, PelUnitBuf& origBuf, RefPicList eRefPicList, int iRefIdx, Mv& rcMvPred, AMVPInfo& rAMVPInfo, bool bFilled)
+{
+  Mv         cBestMv;
+  int        iBestIdx   = 0;
+  Distortion uiBestCost = std::numeric_limits<Distortion>::max();
+  int        i;
+
+  AMVPInfo*  pcAMVPInfo = &rAMVPInfo;
+
+  // Fill the MV Candidates
+  if (!bFilled)
+  {
+    PU::fillMvpCandSpatial( pu, eRefPicList, iRefIdx, *pcAMVPInfo );
+  }
+
+  // initialize Mvp index & Mvp
+  iBestIdx = 0;
+  cBestMv  = pcAMVPInfo->mvCand[0];
+
+  PelUnitBuf predBuf = m_tmpStorageLCU.getBuf( UnitAreaRelative(*pu.cu, pu) );
+
+  //-- Check Minimum Cost.
+  for( i = 0 ; i < pcAMVPInfo->numCand; i++)
+  {
+    Distortion uiTmpCost = xGetTemplateCost( pu, origBuf, predBuf, pcAMVPInfo->mvCand[i], i, AMVP_MAX_NUM_CANDS, eRefPicList, iRefIdx );
+    if( uiBestCost > uiTmpCost )
+    {
+      uiBestCost     = uiTmpCost;
+      cBestMv        = pcAMVPInfo->mvCand[i];
+      iBestIdx       = i;
+    }
+  }
+
+  // Setting Best MVP
+  rcMvPred = cBestMv;
+  pu.mvpIdx[eRefPicList] = iBestIdx;
+  pu.mvpNum[eRefPicList] = pcAMVPInfo->numCand;
+
+  return;
+}
+
+// AMVP
 void InterSearch::xEstimateMvPredAMVP( PredictionUnit& pu, PelUnitBuf& origBuf, RefPicList eRefPicList, int iRefIdx, Mv& rcMvPred, AMVPInfo& rAMVPInfo, bool bFilled, Distortion* puiDistBiP )
 {
   Mv         cBestMv;
@@ -3373,6 +3406,61 @@ Distortion InterSearch::xGetAffineTemplateCost( PredictionUnit& pu, PelUnitBuf& 
   DTRACE( g_trace_ctx, D_COMMON, " (%d) affineTemplateCost=%d\n", DTRACE_GET_COUNTER(g_trace_ctx,D_COMMON), uiCost );
   return uiCost;
 }
+
+void InterSearch::xSimpleMotionEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, RefPicList eRefPicList, Mv& rcMvPred, int iRefIdxPred, Mv& rcMv, int& riMVPIdx, uint32_t& ruiBits, Distortion& ruiCost, const AMVPInfo& amvpInfo)
+{
+
+  Mv cMvHalf, cMvQter;
+
+  CHECK(eRefPicList >= MAX_NUM_REF_LIST_ADAPT_SR || iRefIdxPred>=int(MAX_IDX_ADAPT_SR), "Invalid reference picture list");
+  m_iSearchRange = m_aaiAdaptSR[eRefPicList][iRefIdxPred];
+
+  PelUnitBuf* pBuf       = &origBuf;
+
+
+  //  Search key pattern initialization
+  CPelBuf  tmpPattern   = pBuf->Y();
+  CPelBuf* pcPatternKey = &tmpPattern;
+
+  m_lumaClpRng = pu.cs->slice->clpRng( COMPONENT_Y );
+
+  bool wrap =  pu.cu->slice->getRefPic(eRefPicList, iRefIdxPred)->isWrapAroundEnabled( pu.cs->pps );
+  CPelBuf buf = pu.cu->slice->getRefPic(eRefPicList, iRefIdxPred)->getRecoBuf(pu.blocks[COMPONENT_Y], wrap);
+
+  IntTZSearchStruct cStruct;
+  cStruct.pcPatternKey  = pcPatternKey;
+  cStruct.iRefStride    = buf.stride;
+  cStruct.piRefY        = buf.buf;
+  cStruct.imvShift = pu.cu->imv == IMV_HPEL ? 1 : (pu.cu->imv << 1);
+  cStruct.useAltHpelIf = pu.cu->imv == IMV_HPEL;
+  cStruct.inCtuSearch = false;
+  cStruct.zeroMV = false;
+  {
+    if (m_useCompositeRef && pu.cs->slice->getRefPic(eRefPicList, iRefIdxPred)->longTerm)
+    {
+      cStruct.inCtuSearch = true;
+    }
+  }
+
+  Mv cIntMv;
+
+  {
+    setWpScalingDistParam(iRefIdxPred, eRefPicList, pu.cu->slice);
+  }
+
+  //  Do integer search
+
+  {
+    cStruct.subShiftMode = ( !m_pcEncCfg->getRestrictMESampling() && m_pcEncCfg->getMotionEstimationSearchMethod() == MESEARCH_SELECTIVE ) ? 1 :
+                            ( m_pcEncCfg->getFastInterSearchMode() == FASTINTERSEARCH_MODE1 || m_pcEncCfg->getFastInterSearchMode() == FASTINTERSEARCH_MODE3 ) ? 2 : 0;
+    rcMv = rcMvPred;
+    const Mv *pIntegerMv2Nx2NPred = 0;
+    xTZSearch         ( pu, eRefPicList, iRefIdxPred, cStruct, rcMv, ruiCost, pIntegerMv2Nx2NPred, false );
+  }
+
+}
+
+
 
 void InterSearch::xMotionEstimation(PredictionUnit& pu, PelUnitBuf& origBuf, RefPicList eRefPicList, Mv& rcMvPred, int iRefIdxPred, Mv& rcMv, int& riMVPIdx, uint32_t& ruiBits, Distortion& ruiCost, const AMVPInfo& amvpInfo, bool bBi)
 {
